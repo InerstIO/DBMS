@@ -140,7 +140,7 @@ private:
 
   // RID.pageNum can be equal numPages if no enough free space.
   // Need to append a new page in this case.
-  RID insertPos(FileHandle &fileHandle, int length);
+  RC insertPos(FileHandle &fileHandle, int length, RID &rid);
   // Return num of free bytes in the page.
   unsigned freeSpace(const void *data);
   // Insert record to data.

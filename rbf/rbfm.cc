@@ -41,7 +41,10 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
     int length = 0;
     char *record = (char *)data2record(data, recordDescriptor, length);
-    RID rid = insertPos(fileHandle, length);
+    RC rc = insertPos(fileHandle, length, rid);
+    if (rc) {
+        return rc;
+    }
     void *page = malloc(PAGE_SIZE);
     if (rid.pageNum == fileHandle.getNumberOfPages()) {
         //init the page
@@ -79,15 +82,17 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
     return -1;
 }
 
-RID RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length) {
+RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
-    RID rid = {};
     void *data = malloc(PAGE_SIZE);
     int pageNum;
     
     for (pageNum = curPage; pageNum >= 0; pageNum--)
     {
-        fileHandle.readPage(pageNum, data);
+        int rc = fileHandle.readPage(pageNum, data);
+        if (rc) {
+            return rc;
+        }
         if (freeSpace(data) >= length + sizeof(SlotDir)) {
             break;
         }
@@ -104,7 +109,7 @@ RID RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length) {
     rid.pageNum = pageNum;
 
     free(data);
-    return rid;
+    return 0;
 }
 
 unsigned RecordBasedFileManager::freeSpace(const void *data) {
