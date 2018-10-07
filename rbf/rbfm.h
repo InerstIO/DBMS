@@ -31,6 +31,11 @@ struct Attribute {
     AttrLength length; // attribute length
 };
 
+struct SlotDir {
+  unsigned offset;
+  unsigned length;
+};
+
 void* data2record(const void* data, const vector<Attribute>& recordDescriptor, int& length);
 
 // Comparison Operator (NOT needed for part 1 of the project)
@@ -143,7 +148,13 @@ protected:
 private:
   static RecordBasedFileManager *_rbf_manager;
 
-  RID findInsertPos();
+  // RID.pageNum can be equal numPages if no enough free space.
+  // Need to append a new page in this case.
+  RC insertPos(FileHandle &fileHandle, int length, RID &rid);
+  // Return num of free bytes in the page.
+  unsigned freeSpace(const void *data);
+  // Insert record to data.
+  void insert2data(void *data, char *record, int length, int slotNum);
 };
 
 #endif
