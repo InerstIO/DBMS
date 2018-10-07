@@ -28,6 +28,11 @@ struct Attribute {
     AttrLength length; // attribute length
 };
 
+struct SlotDir {
+  unsigned offset;
+  unsigned length;
+};
+
 // Comparison Operator (NOT needed for part 1 of the project)
 typedef enum { EQ_OP = 0, // no condition// = 
            LT_OP,      // <
@@ -132,6 +137,12 @@ protected:
 
 private:
   static RecordBasedFileManager *_rbf_manager;
+
+  // RID.pageNum can be equal numPages if no enough free space.
+  // Need to append a new page in this case.
+  RID insertPos(FileHandle &fileHandle, int length);
+  // Return num of free bytes in the page.
+  unsigned freeSpace(const void *data);
 };
 
 #endif
