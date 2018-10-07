@@ -6,8 +6,22 @@ typedef int RC;
 typedef char byte;
 
 #define PAGE_SIZE 4096
+#define PAGENUM_EXCEED -8
+#define SUCCESS 0
+#define FILE_NOT_EXIST -2
+#define FILE_EXISTED -3
+#define FILE_DELETE_FAIL -4
+#define HANDLE_USED -5
+#define OPEN_HANDLE_FAIL -6
+#define WRONG_DATA_SIZE -7
+#define READ_PAGE_FAIL -9
+#define WRITE_PAGE_FAIL -10
 #include <string>
 #include <climits>
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+#include <cstring>
 using namespace std;
 
 class FileHandle;
@@ -38,6 +52,7 @@ public:
     unsigned readPageCounter;
     unsigned writePageCounter;
     unsigned appendPageCounter;
+    fstream filefs;
     
     FileHandle();                                                         // Default constructor
     ~FileHandle();                                                        // Destructor
