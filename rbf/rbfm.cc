@@ -210,7 +210,52 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
 }
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
-    return -1;
+    int attrNum = recordDescriptor.size();
+    // better to make it into a function?
+    int nullIndSize = ceil((double)attrNum/(double)8);
+    vector<bitset<8>> nullBits;
+    for(int i = 0; i < nullIndSize; i++){
+        bitset<8> onebyte(*((char*)data+i));
+        nullBits.push_back(onebyte);
+    }
+    //
+    int offset = nullIndSize;
+    int intVal, charLen;
+    float floatVal;
+
+    for(int i = 0; i < attrNum; i++)
+    {
+        cout<<recordDescriptor[i].name<<": ";
+        if (nullBits[i/8][7-i%8]) {
+            cout<<"NULL"<<endl;
+        }
+        else {
+            switch (recordDescriptor[i].type)
+            {
+                case 0:
+                    memcpy(&intVal, (char *)data + offset, sizeof(int));
+                    cout<<intVal<<endl;
+                    offset += sizeof(int);
+                    break;
+                case 1:
+                    memcpy(&floatVal, (char *)data + offset, sizeof(float));
+                    cout<<floatVal<<endl;
+                    offset += sizeof(float);
+                    break;
+                case 2:
+                    memcpy(&charLen, (char *)data + offset, sizeof(int));
+                    offset += sizeof(int);
+                    char *str = new char[charLen+1];
+                    memcpy(str, (char *)data + offset, charLen);
+                    str[charLen] = '\0';
+                    offset += charLen;
+                    cout<<str<<endl;
+                    delete[] str;
+                    break;
+            }
+        }
+    }
+    return 0;
 }
 
 RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length, RID &rid) {
