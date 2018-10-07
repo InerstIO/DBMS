@@ -39,7 +39,36 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    return -1;
+    int length = 0;
+    char *record = (char *)data2record(data, recordDescriptor, length);
+    RID rid = insertPos(fileHandle, length);
+    void *page = malloc(PAGE_SIZE);
+    if (rid.pageNum == fileHandle.getNumberOfPages()) {
+        //init the page
+        int zero = 0;
+        memcpy((char *)page + PAGE_SIZE - sizeof(int), &zero, sizeof(int));
+        memcpy((char *)page + PAGE_SIZE - 2 * sizeof(int), &zero, sizeof(int));
+        //update the page
+        insert2data(page, record, length, rid.slotNum);
+        //append new page
+        int rc = fileHandle.appendPage(page);
+        if (rc) {
+            return rc;
+        }
+    }
+    else
+    {
+        fileHandle.readPage(rid.pageNum, page);
+        //update the page
+        insert2data(page, record, length, rid.slotNum);
+        //write page
+        int rc = fileHandle.writePage(rid.pageNum, page);
+        if (rc) {
+            return rc;
+        }
+    }
+    free(page);
+    return 0;
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
@@ -85,4 +114,20 @@ unsigned RecordBasedFileManager::freeSpace(const void *data) {
     memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
     int freeEnd = PAGE_SIZE - 2 * sizeof(int) - numSlots * sizeof(SlotDir);
     return freeEnd - freeBegin;
+}
+
+void RecordBasedFileManager::insert2data(void *data, char *record, int length, int slotNum) {
+    // Insert record.
+    int freeBegin;
+    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
+    memcpy((char *)data + freeBegin, record, length);
+    // Insert SoltDir.
+    SlotDir slotDir = {freeBegin, slotNum};
+    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    // Update free space.
+    freeBegin += length;
+    memcpy((char *)data + PAGE_SIZE - sizeof(int), &freeBegin, sizeof(int));
+    // Update num of slots.
+    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int), &slotNum, sizeof(int));
+    return;
 }
