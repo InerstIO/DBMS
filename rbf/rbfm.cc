@@ -215,10 +215,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     SlotDir slotDir;
     memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(int) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
     char *record = new char[slotDir.length];
-    memcpy(&record, page + slotDir.offset, slotDir.length);
-    for(int i=0;i<slotDir.length;i++){
-        cout<<i<<": "<<*((char*)record+i)<<endl;
-    }
+    memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
     int length;// No need???????????????????????????????????????????????????????
     data = record2data(record, recordDescriptor, length);
     delete[] record;
