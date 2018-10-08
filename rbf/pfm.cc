@@ -61,6 +61,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
             memcpy(&(fileHandle.readPageCounter), firstPage, sizeof(int));
             memcpy(&(fileHandle.writePageCounter), firstPage+4, sizeof(int));
             memcpy(&(fileHandle.appendPageCounter), firstPage+8, sizeof(int));
+            delete[] firstPage;
 	        rc = SUCCESS;
 	   } else{
 	        rc = OPEN_HANDLE_FAIL;
