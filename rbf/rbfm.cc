@@ -182,7 +182,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     if (rc) {
         return rc;
     }
-    void *page = new char[PAGE_SIZE];
+    void *page = malloc(PAGE_SIZE);
     if (rid.pageNum == fileHandle.getNumberOfPages()) {
         //init the page
         int zero = 0;
@@ -209,12 +209,12 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
             return rc;
         }
     }
-    delete[] page;
+    free(page);
     return 0;
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
-    void *page = new char[PAGE_SIZE];
+    void *page = malloc(PAGE_SIZE);
     int rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
         return rc;
@@ -224,7 +224,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     char *record = new char[slotDir.length];
     memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
     record2data(record, recordDescriptor, data);
-    delete[] page;
+    free(page);
     delete[] record;
     return 0;
 }
