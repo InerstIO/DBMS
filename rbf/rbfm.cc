@@ -82,19 +82,19 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, i
         *((char*)record+length) = *(values+i);
         length++;
     }
-    delete values;
+    delete[] values;
     return (void*)record;
 }
 
 void* record2data(const void* record, const vector<Attribute>& recordDescriptor, int& length){
     int pos = 0;
-    int* num = new int[1];
-    memcpy(num, record, 4);
+    int num;
+    memcpy(&num, record, 4);
     pos += 4;
     short lastPointer = 0;
-    vector<char> nullIndicator(ceil((double)*num/8), 0);
+    vector<char> nullIndicator(ceil((double)num/8), 0);
     vector<short> pointers;
-    for(int i=0;i<*num;i++){
+    for(int i=0;i<num;i++){
         short pointer;
         memcpy(&pointer, (char*)record+pos, sizeof(short));
         pos += 2;
@@ -106,7 +106,7 @@ void* record2data(const void* record, const vector<Attribute>& recordDescriptor,
             lastPointer = pointer;
         }
     }
-    int dataLength = ceil((double)*num/8)+lastPointer;
+    int dataLength = ceil((double)num/8)+lastPointer;
     char* data = new char[dataLength];
     //cout<<nullIndicator.size()<<endl;
     for(int i=0;i<nullIndicator.size();i++){

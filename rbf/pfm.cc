@@ -102,7 +102,7 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
     pageNum = pageNum+1;
     RC rc = -1;
     //if(sizeof(*(char*)data) == PAGE_SIZE){
-        if(pageNum <= getNumberOfPages()){
+        if(pageNum < getNumberOfPages()){
             filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
             filefs.read((char*)data, PAGE_SIZE);
             if(filefs){
@@ -151,7 +151,8 @@ RC FileHandle::appendPage(const void *data)
     //cout<<sizeof((char*)data)<<endl;
     //if(sizeof(*(char*)data) == PAGE_SIZE){
         //cout<<"hyx1"<<endl;
-        filefs<<(char*)data;
+        filefs.seekg((appendPageCounter+1)*PAGE_SIZE, filefs.beg);
+        filefs.write((char*)data, PAGE_SIZE);
         //cout<<"hyx2"<<endl;
         rc = SUCCESS;
     //} else{
