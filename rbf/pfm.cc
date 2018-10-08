@@ -102,7 +102,7 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
     pageNum = pageNum+1;
     RC rc = -1;
     //if(sizeof(*(char*)data) == PAGE_SIZE){
-        if(pageNum < getNumberOfPages()){
+        if(pageNum <= getNumberOfPages()){
             filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
             filefs.read((char*)data, PAGE_SIZE);
             if(filefs){
