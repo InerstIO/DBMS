@@ -205,11 +205,69 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
-    return -1;
+    void *page = malloc(PAGE_SIZE);
+    int rc = fileHandle.readPage(rid.pageNum, page);
+    if (rc) {
+        cout << rid.pageNum << rid.slotNum<<endl;
+        return rc;
+    }
+    SlotDir slotDir;
+    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(int) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
+    char *record = new char[slotDir.length];
+    memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
+    int length;// No need???????????????????????????????????????????????????????
+    data = record2data(record, recordDescriptor, length);
+    delete[] record;
+    return 0;
 }
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
-    return -1;
+    int attrNum = recordDescriptor.size();
+    // better to make it into a function?
+    int nullIndSize = ceil((double)attrNum/(double)8);
+    vector<bitset<8>> nullBits;
+    for(int i = 0; i < nullIndSize; i++){
+        bitset<8> onebyte(*((char*)data+i));
+        nullBits.push_back(onebyte);
+    }
+    //
+    int offset = nullIndSize;
+    int intVal, charLen;
+    float floatVal;
+
+    for(int i = 0; i < attrNum; i++)
+    {
+        cout<<recordDescriptor[i].name<<": ";
+        if (nullBits[i/8][7-i%8]) {
+            cout<<"NULL"<<endl;
+        }
+        else {
+            switch (recordDescriptor[i].type)
+            {
+                case 0:
+                    memcpy(&intVal, (char *)data + offset, sizeof(int));
+                    cout<<intVal<<endl;
+                    offset += sizeof(int);
+                    break;
+                case 1:
+                    memcpy(&floatVal, (char *)data + offset, sizeof(float));
+                    cout<<floatVal<<endl;
+                    offset += sizeof(float);
+                    break;
+                case 2:
+                    memcpy(&charLen, (char *)data + offset, sizeof(int));
+                    offset += sizeof(int);
+                    char *str = new char[charLen+1];
+                    memcpy(str, (char *)data + offset, charLen);
+                    str[charLen] = '\0';
+                    offset += charLen;
+                    cout<<str<<endl;
+                    delete[] str;
+                    break;
+            }
+        }
+    }
+    return 0;
 }
 
 RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length, RID &rid) {
@@ -257,7 +315,7 @@ void RecordBasedFileManager::insert2data(void *data, char *record, int length, i
     memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
     memcpy((char *)data + freeBegin, record, length);
     // Insert SoltDir.
-    SlotDir slotDir = {freeBegin, slotNum};
+    SlotDir slotDir = {freeBegin, length};
     memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
     // Update free space.
     freeBegin += length;
