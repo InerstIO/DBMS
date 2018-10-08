@@ -319,7 +319,7 @@ void RecordBasedFileManager::insert2data(void *data, char *record, int length, i
     memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
     memcpy((char *)data + freeBegin, record, length);
     // Insert SoltDir.
-    SlotDir slotDir = {freeBegin, slotNum};
+    SlotDir slotDir = {freeBegin, length};
     memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
     // Update free space.
     freeBegin += length;
