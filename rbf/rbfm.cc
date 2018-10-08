@@ -212,7 +212,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
-    void *page = malloc(PAGE_SIZE);
+    void *page = new char[PAGE_SIZE];
     int rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
         return rc;
@@ -222,6 +222,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     char *record = new char[slotDir.length];
     memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
     record2data(record, recordDescriptor, data);
+    delete[] page;
     delete[] record;
     return 0;
 }
