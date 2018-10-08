@@ -206,7 +206,23 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
-    return -1;
+    void *page = malloc(PAGE_SIZE);
+    int rc = fileHandle.readPage(rid.pageNum, page);
+    if (rc) {
+        cout << rid.pageNum << rid.slotNum<<endl;
+        return rc;
+    }
+    SlotDir slotDir;
+    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(int) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
+    char *record = new char[slotDir.length];
+    memcpy(&record, page + slotDir.offset, slotDir.length);
+    for(int i=0;i<slotDir.length;i++){
+        cout<<i<<": "<<*((char*)record+i)<<endl;
+    }
+    int length;// No need???????????????????????????????????????????????????????
+    data = record2data(record, recordDescriptor, length);
+    delete[] record;
+    return 0;
 }
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
