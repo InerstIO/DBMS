@@ -182,7 +182,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     if (rc) {
         return rc;
     }
-    void *page = malloc(PAGE_SIZE);
+    void *page = new char[PAGE_SIZE];
     if (rid.pageNum == fileHandle.getNumberOfPages()) {
         //init the page
         int zero = 0;
@@ -190,6 +190,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
         memcpy((char *)page + PAGE_SIZE - 2 * sizeof(int), &zero, sizeof(int));
         //update the page
         insert2data(page, record, length, rid.slotNum);
+        delete[] record;
         //append new page
         int rc = fileHandle.appendPage(page);
         if (rc) {
@@ -201,13 +202,14 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
         fileHandle.readPage(rid.pageNum, page);
         //update the page
         insert2data(page, record, length, rid.slotNum);
+        delete[] record;
         //write page
         int rc = fileHandle.writePage(rid.pageNum, page);
         if (rc) {
             return rc;
         }
     }
-    free(page);
+    delete[] page;
     return 0;
 }
 
