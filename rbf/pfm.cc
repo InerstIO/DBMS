@@ -79,6 +79,7 @@ RC PagedFileManager::closeFile(FileHandle &fileHandle)
     fileHandle.filefs.write(firstPage, PAGE_SIZE);
     fileHandle.filefs.flush();
     fileHandle.filefs.close();
+    delete[] firstPage;
     return SUCCESS;
 }
 
