@@ -32,6 +32,7 @@ RC PagedFileManager::createFile(const string &fileName)
        outfile.write(firstPage, PAGE_SIZE);
        outfile.flush();
 	   outfile.close();
+       delete[] firstPage;
 	   return SUCCESS;
     }
     return -1;
