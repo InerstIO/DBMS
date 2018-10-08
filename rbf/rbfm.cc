@@ -207,14 +207,12 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     void *page = malloc(PAGE_SIZE);
     int rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
-        //cout << rid.pageNum << rid.slotNum<<endl;
         return rc;
     }
     SlotDir slotDir;
     memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(int) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
     char *record = new char[slotDir.length];
     memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
-    //int length;// No need???????????????????????????????????????????????????????
     record2data(record, recordDescriptor, data);
     delete[] record;
     return 0;
