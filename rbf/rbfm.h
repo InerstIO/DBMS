@@ -154,7 +154,7 @@ private:
   // Return num of free bytes in the page.
   unsigned freeSpace(const void *data);
   // Insert record to data.
-  void insert2data(void *data, char *record, int length, int slotNum);
+  void insert2data(void *data, char *record, unsigned length, int slotNum);
 };
 
 #endif

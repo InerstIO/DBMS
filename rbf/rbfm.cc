@@ -2,7 +2,7 @@
 
 #include "rbfm.h"
 
-void* data2record(const void* data, const vector<Attribute>& recordDescriptor, int& length){
+void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned& length){
     /*for(int i=0;i<54;i++){
         cout<<i<<": "<<(int)*((char*)data+i)<<endl;
     }*/
@@ -16,7 +16,7 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, i
     }
     int recordSize = 4;
     int valSize = 0;
-    for(int i=0;i<recordDescriptor.size();i++){
+    for(unsigned i=0;i<recordDescriptor.size();i++){
         recordSize += 2;
         recordSize += recordDescriptor[i].length;
         valSize += recordDescriptor[i].length;
@@ -35,7 +35,6 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, i
     char* values = new char[valSize];
     int valLength = 0;
     short offset = 0;
-    int charCnt = 0;
     dataPos += nullIndSize;
     for(int i=0;i<attrNum;i++){
         //cout<<"p4"<<endl;
@@ -93,7 +92,6 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
     memcpy(&num, record, 4);
     pos += 4;
     //cout<<"num: "<<num<<endl;
-    short lastPointer = 0;
     vector<char> nullIndicator(ceil((double)num/8), 0);
     vector<short> pointers;
     for(int i=0;i<num;i++){
@@ -105,17 +103,14 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
         if(pointer == -1){
             //cout<<"pointer "<<i<<": "<<(1<<(7-i%8))<<endl;
             nullIndicator[i/8] += 1<<(7-i%8);
-        } else{
-            lastPointer = pointer;
         }
     }
-    int dataLength = ceil((double)num/8)+lastPointer;
     //cout<<nullIndicator.size()<<endl;
-    for(int i=0;i<nullIndicator.size();i++){
+    for(unsigned i=0;i<nullIndicator.size();i++){
         ((char*)data)[length] = nullIndicator[i];
         length++;
     }
-    for(int i=0;i<recordDescriptor.size();i++){
+    for(unsigned i=0;i<recordDescriptor.size();i++){
         if(pointers[i] != -1){
         if(recordDescriptor[i].type == 2){
             int l = i>0?pointers[i]-pointers[i-1]:pointers[i];
@@ -176,7 +171,7 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    int length = 0;
+    unsigned length = 0;
     char *record = (char *)data2record(data, recordDescriptor, length);
     RC rc = insertPos(fileHandle, length, rid);
     if (rc) {
@@ -317,9 +312,9 @@ unsigned RecordBasedFileManager::freeSpace(const void *data) {
     return freeEnd - freeBegin;
 }
 
-void RecordBasedFileManager::insert2data(void *data, char *record, int length, int slotNum) {
+void RecordBasedFileManager::insert2data(void *data, char *record, unsigned length, int slotNum) {
     // Insert record.
-    int freeBegin;
+    unsigned freeBegin;
     memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
     memcpy((char *)data + freeBegin, record, length);
     // Insert SoltDir.
