@@ -44,22 +44,22 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, i
             if(recordDescriptor[i].type == 0 || recordDescriptor[i].type == 1){
                 //cout<<"p9"<<endl;
                 offset += 4;
-                cout<<i<<": ";
+                //cout<<i<<": ";
                 for(int j=0;j<4;j++){
                     //cout<<i<<": "<<valLength<<endl;
                     //cout<<valLength<<", "<<nullIndSize<<endl;
-                    cout<<(int)*((char*)data+dataPos)<<", ";
+                    //cout<<(int)*((char*)data+dataPos)<<", ";
                     *(values+valLength) = *((char*)data+dataPos);
                     dataPos++;
                     valLength++;
                 }
-                cout<<endl;
+                //cout<<endl;
             } else{
                 //cout<<"p10"<<endl;
                 //cout<<dataPos<<", "<<(int)*((char*)data+dataPos)<<((int)*((char*)data+dataPos+1)<<8)<<((int)*((char*)data+dataPos+2)<<16)<<((int)*((char*)data+dataPos+3)<<24)<<endl;
                 int stringLength = (int)*((char*)data+dataPos)+((int)*((char*)data+dataPos+1)<<8)+((int)*((char*)data+dataPos+2)<<16)+((int)*((char*)data+dataPos+3)<<24);
                 dataPos += 4;
-                cout<<"stringlength: "<<stringLength<<endl;
+                //cout<<"stringlength: "<<stringLength<<endl;
                 offset += stringLength;
                 for(int j=0;j<stringLength;j++){
                     *((char*)values+valLength) = *((char*)data+dataPos);
@@ -101,23 +101,22 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
         pos += 2;
         pointers.push_back(pointer);
         if(pointer == 0xffff){
-            cout<<"pointer "<<i<<": "<<(1<<(7-i%8));
+            //cout<<"pointer "<<i<<": "<<(1<<(7-i%8));
             nullIndicator[i/8] += 1<<(7-i%8);
         } else{
             lastPointer = pointer;
         }
     }
     int dataLength = ceil((double)num/8)+lastPointer;
-    char* data = new char[dataLength];
     //cout<<nullIndicator.size()<<endl;
     for(int i=0;i<nullIndicator.size();i++){
-        ((char*))data[length] = nullIndicator[i];
+        ((char*)data)[length] = nullIndicator[i];
         length++;
     }
     for(int i=0;i<recordDescriptor.size();i++){
         if(recordDescriptor[i].type == 2){
             int l = i>0?pointers[i]-pointers[i-1]:pointers[i];
-            cout<<i<<": "<<l<<endl;
+           // cout<<i<<": "<<l<<endl;
             memcpy((char*)data+length, &l, sizeof(int));
             length += 4;
             memcpy((char*)data+length, (char*)record+pos, l);
