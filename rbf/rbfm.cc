@@ -92,6 +92,7 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
     int num;
     memcpy(&num, record, 4);
     pos += 4;
+    //cout<<"num: "<<num<<endl;
     short lastPointer = 0;
     vector<char> nullIndicator(ceil((double)num/8), 0);
     vector<short> pointers;
@@ -100,8 +101,9 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
         memcpy(&pointer, (char*)record+pos, sizeof(short));
         pos += 2;
         pointers.push_back(pointer);
-        if(pointer == 0xffff){
-            //cout<<"pointer "<<i<<": "<<(1<<(7-i%8));
+        //cout<<pointer<<endl;
+        if(pointer == -1){
+            //cout<<"pointer "<<i<<": "<<(1<<(7-i%8))<<endl;
             nullIndicator[i/8] += 1<<(7-i%8);
         } else{
             lastPointer = pointer;
@@ -114,9 +116,10 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
         length++;
     }
     for(int i=0;i<recordDescriptor.size();i++){
+        if(pointers[i] != -1){
         if(recordDescriptor[i].type == 2){
             int l = i>0?pointers[i]-pointers[i-1]:pointers[i];
-           // cout<<i<<": "<<l<<endl;
+            //cout<<i<<": "<<l<<endl;
             memcpy((char*)data+length, &l, sizeof(int));
             length += 4;
             memcpy((char*)data+length, (char*)record+pos, l);
@@ -124,8 +127,13 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
             pos += l;
         } else{
             memcpy((char*)data+length, (char*)record+pos, 4);
+            /*cout<<"ith num: "<<i<<endl;
+            for(int i=0;i<4;i++){
+                cout<<(int)((char*)record)[length+i]<<endl;
+            }*/
             length += 4;
             pos += 4;
+        }
         }
     }
 }
