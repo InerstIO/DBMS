@@ -86,7 +86,8 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, i
     return (void*)record;
 }
 
-void* record2data(const void* record, const vector<Attribute>& recordDescriptor, int& length){
+void record2data(const void* record, const vector<Attribute>& recordDescriptor, void* data){
+    int length = 0;
     int pos = 0;
     int num;
     memcpy(&num, record, 4);
@@ -110,26 +111,24 @@ void* record2data(const void* record, const vector<Attribute>& recordDescriptor,
     char* data = new char[dataLength];
     //cout<<nullIndicator.size()<<endl;
     for(int i=0;i<nullIndicator.size();i++){
-        data[length] = nullIndicator[i];
+        ((char*))data[length] = nullIndicator[i];
         length++;
     }
     for(int i=0;i<recordDescriptor.size();i++){
         if(recordDescriptor[i].type == 2){
             int l = i>0?pointers[i]-pointers[i-1]:pointers[i];
             cout<<i<<": "<<l<<endl;
-            memcpy(data+length, &l, sizeof(int));
+            memcpy((char*)data+length, &l, sizeof(int));
             length += 4;
-            memcpy(data+length, (char*)record+pos, l);
+            memcpy((char*)data+length, (char*)record+pos, l);
             length += l;
             pos += l;
         } else{
-            memcpy(data+length, (char*)record+pos, 4);
+            memcpy((char*)data+length, (char*)record+pos, 4);
             length += 4;
             pos += 4;
         }
     }
-    return data;
-
 }
 
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = 0;
