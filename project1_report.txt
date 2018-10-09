@@ -1,8 +1,10 @@
 1. Basic information
+Student ID : 20689831
+Student Name : Yuxuan Hao
 Student ID : 25245625
 Student Name : Yu Feng
-OS (bit) :
-gcc version :
+OS (bit) : Ubuntu 16.04.3 x64
+gcc version : 5.4.0 20160609
 
 
 2. Internal Record Format
