@@ -23,6 +23,13 @@ As we store the record in this format, we do not need to do any special handling
 
 3. Page Format
 - Show your page format design
+----------------------------------------------
+record1|record2|...|recordN|
+.
+free space
+.
+                    |SlotDirN|...|SlotDir1|N|F
+----------------------------------------------
 Records are appended to the free space offset in the page (in the top part of the page) until there is not enough free space left in that page.
 The last byte of the page is used to store the the offset of free space, so that new records can be appended at that offset, let's call it F.
 The byte before the last byte is used to store the number of records in that page, let's call it N.
