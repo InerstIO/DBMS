@@ -4,6 +4,10 @@
 #include <string>
 #include <vector>
 #include <climits>
+#include <math.h>
+#include <bitset>
+#include <stdio.h>
+#include <cstring>
 
 #include "../rbf/pfm.h"
 
@@ -16,7 +20,6 @@ typedef struct
   unsigned slotNum;    // slot number in the page
 } RID;
 
-
 // Attribute
 typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
 
@@ -27,6 +30,13 @@ struct Attribute {
     AttrType type;     // attribute type
     AttrLength length; // attribute length
 };
+
+struct SlotDir {
+  unsigned offset;
+  unsigned length;
+};
+
+void* data2record(const void* data, const vector<Attribute>& recordDescriptor, int& length);
 
 // Comparison Operator (NOT needed for part 1 of the project)
 typedef enum { EQ_OP = 0, // no condition// = 
@@ -71,6 +81,11 @@ class RecordBasedFileManager
 {
 public:
   static RecordBasedFileManager* instance();
+
+  PagedFileManager* pfm;
+
+  int curPage;
+  int curSlot;
 
   RC createFile(const string &fileName);
   
@@ -132,6 +147,14 @@ protected:
 
 private:
   static RecordBasedFileManager *_rbf_manager;
+
+  // RID.pageNum can be equal numPages if no enough free space.
+  // Need to append a new page in this case.
+  RC insertPos(FileHandle &fileHandle, int length, RID &rid);
+  // Return num of free bytes in the page.
+  unsigned freeSpace(const void *data);
+  // Insert record to data.
+  void insert2data(void *data, char *record, unsigned length, int slotNum);
 };
 
 #endif
