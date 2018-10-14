@@ -36,7 +36,9 @@ struct SlotDir {
   unsigned length;
 };
 
+vector<bitset<8>> nullIndicators(int size, const void *data);
 void* data2record(const void* data, const vector<Attribute>& recordDescriptor, int& length);
+void record2data(const void* record, const vector<Attribute>& recordDescriptor, void* data);
 
 // Comparison Operator (NOT needed for part 1 of the project)
 typedef enum { EQ_OP = 0, // no condition// = 

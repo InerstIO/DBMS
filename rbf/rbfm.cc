@@ -2,15 +2,20 @@
 
 #include "rbfm.h"
 
+vector<bitset<8>> nullIndicators(int size, const void *data) {
+    vector<bitset<8>> nullBits;
+    for(int i = 0; i < size; i++){
+        bitset<8> onebyte(*((char*)data+i));
+        nullBits.push_back(onebyte);
+    }
+    return nullBits;
+}
+
 void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned& length){
     int dataPos = 0;
     int attrNum = recordDescriptor.size();
     int nullIndSize = ceil((double)attrNum/(double)8);
-    vector<bitset<8>> nullBits;
-    for(int i=0;i<nullIndSize;i++){
-        bitset<8> onebyte(*((char*)data+i));
-        nullBits.push_back(onebyte);
-    }
+    vector<bitset<8>> nullBits = nullIndicators(nullIndSize, data);
     int recordSize = 4;
     int valSize = 0;
     for(unsigned i=0;i<recordDescriptor.size();i++){
@@ -198,14 +203,8 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
     int attrNum = recordDescriptor.size();
-    // better to make it into a function?
     int nullIndSize = ceil((double)attrNum/(double)8);
-    vector<bitset<8>> nullBits;
-    for(int i = 0; i < nullIndSize; i++){
-        bitset<8> onebyte(*((char*)data+i));
-        nullBits.push_back(onebyte);
-    }
-    //
+    vector<bitset<8>> nullBits = nullIndicators(nullIndSize, data);
     int offset = nullIndSize;
     int intVal, charLen;
     float floatVal;
