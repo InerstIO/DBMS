@@ -157,6 +157,8 @@ private:
   unsigned freeSpace(const void *data);
   // Insert record to data.
   void insert2data(void *data, char *record, unsigned short length, int slotNum);
+  // Get slotDir from rid and page.
+  SlotDir getSlotDir(const RID &rid, const void* page);
 };
 
 #endif
