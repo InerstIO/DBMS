@@ -117,6 +117,7 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
             filefs.seekg(0, filefs.beg);
             filefs.write(firstPage, PAGE_SIZE);
             filefs.flush();
+            delete[] firstPage;
         } else{
             rc = READ_PAGE_FAIL;
         }
@@ -144,6 +145,7 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
             filefs.seekg(0, filefs.beg);
             filefs.write(firstPage, PAGE_SIZE);
             filefs.flush();
+            delete[] firstPage;
         } else{
             rc = WRITE_PAGE_FAIL;
         }
@@ -168,6 +170,7 @@ RC FileHandle::appendPage(const void *data)
     filefs.seekg(0, filefs.beg);
     filefs.write(firstPage, PAGE_SIZE);
     filefs.flush();
+    delete[] firstPage;
     return rc;
 }
 
