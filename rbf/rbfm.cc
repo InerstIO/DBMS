@@ -171,12 +171,15 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     }
     else
     {
-        fileHandle.readPage(rid.pageNum, page);
+        int rc = fileHandle.readPage(rid.pageNum, page);
+        if (rc) {
+            return rc;
+        }
         //update the page
         insert2data(page, record, length, rid.slotNum);
         delete[] record;
         //write page
-        int rc = fileHandle.writePage(rid.pageNum, page);
+        rc = fileHandle.writePage(rid.pageNum, page);
         if (rc) {
             return rc;
         }
