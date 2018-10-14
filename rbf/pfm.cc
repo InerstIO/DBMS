@@ -104,29 +104,25 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
 {
     pageNum = pageNum+1;
     RC rc = -1;
-    //if(sizeof(*(char*)data) == PAGE_SIZE){
-        if(pageNum <= getNumberOfPages()){
-            filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
-            filefs.read((char*)data, PAGE_SIZE);
-            if(filefs){
-                rc = SUCCESS;
-                readPageCounter++;
-                char* firstPage = new char[PAGE_SIZE];
-                memcpy(firstPage, &(readPageCounter), sizeof(int));
-                memcpy(firstPage+4, &(writePageCounter), sizeof(int));
-                memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
-                filefs.seekg(0, filefs.beg);
-                filefs.write(firstPage, PAGE_SIZE);
-                filefs.flush();
-            } else{
-                rc = READ_PAGE_FAIL;
-            }
+    if(pageNum <= getNumberOfPages()){
+        filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
+        filefs.read((char*)data, PAGE_SIZE);
+        if(filefs){
+            rc = SUCCESS;
+            readPageCounter++;
+            char* firstPage = new char[PAGE_SIZE];
+            memcpy(firstPage, &(readPageCounter), sizeof(int));
+            memcpy(firstPage+4, &(writePageCounter), sizeof(int));
+            memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
+            filefs.seekg(0, filefs.beg);
+            filefs.write(firstPage, PAGE_SIZE);
+            filefs.flush();
         } else{
-            rc = PAGENUM_EXCEED;
+            rc = READ_PAGE_FAIL;
         }
-    //} else{
-    //    rc = WRONG_DATA_SIZE;
-    //}
+    } else{
+        rc = PAGENUM_EXCEED;
+    }
     return rc;
 }
 
@@ -135,29 +131,25 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
     RC rc = -1;
     pageNum += 1;
-    //if(sizeof(*(char*)data) == PAGE_SIZE){
-        if(pageNum <= getNumberOfPages()){
-            filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
-            filefs.write((char*)data, PAGE_SIZE);
-            if(filefs){
-                rc = SUCCESS;
-                writePageCounter++;
-                char* firstPage = new char[PAGE_SIZE];
-                memcpy(firstPage, &(readPageCounter), sizeof(int));
-                memcpy(firstPage+4, &(writePageCounter), sizeof(int));
-                memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
-                filefs.seekg(0, filefs.beg);
-                filefs.write(firstPage, PAGE_SIZE);
-                filefs.flush();
-            } else{
-                rc = WRITE_PAGE_FAIL;
-            }
+    if(pageNum <= getNumberOfPages()){
+        filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
+        filefs.write((char*)data, PAGE_SIZE);
+        if(filefs){
+            rc = SUCCESS;
+            writePageCounter++;
+            char* firstPage = new char[PAGE_SIZE];
+            memcpy(firstPage, &(readPageCounter), sizeof(int));
+            memcpy(firstPage+4, &(writePageCounter), sizeof(int));
+            memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
+            filefs.seekg(0, filefs.beg);
+            filefs.write(firstPage, PAGE_SIZE);
+            filefs.flush();
         } else{
-            rc = PAGENUM_EXCEED;
+            rc = WRITE_PAGE_FAIL;
         }
-    //} else{
-      //  rc = WRONG_DATA_SIZE;
-    //}
+    } else{
+        rc = PAGENUM_EXCEED;
+    }
     return rc;
 }
 
@@ -165,16 +157,9 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 RC FileHandle::appendPage(const void *data)
 {
     RC rc = -1;
-    //cout<<sizeof((char*)data)<<endl;
-    //if(sizeof(*(char*)data) == PAGE_SIZE){
-        //cout<<"hyx1"<<endl;
-        filefs.seekg((appendPageCounter+1)*PAGE_SIZE, filefs.beg);
-        filefs.write((char*)data, PAGE_SIZE);
-        //cout<<"hyx2"<<endl;
-        rc = SUCCESS;
-    //} else{
-      //  rc = WRONG_DATA_SIZE;
-    //}
+    filefs.seekg((appendPageCounter+1)*PAGE_SIZE, filefs.beg);
+    filefs.write((char*)data, PAGE_SIZE);
+    rc = SUCCESS;
     appendPageCounter++;
     char* firstPage = new char[PAGE_SIZE];
     memcpy(firstPage, &(readPageCounter), sizeof(int));
