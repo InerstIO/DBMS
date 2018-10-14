@@ -32,12 +32,12 @@ struct Attribute {
 };
 
 struct SlotDir {
-  unsigned offset;
-  unsigned length;
+  unsigned short offset;
+  unsigned short length;
 };
 
 vector<bitset<8>> nullIndicators(int size, const void *data);
-void* data2record(const void* data, const vector<Attribute>& recordDescriptor, int& length);
+void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned short& length);
 void record2data(const void* record, const vector<Attribute>& recordDescriptor, void* data);
 
 // Comparison Operator (NOT needed for part 1 of the project)
@@ -152,11 +152,11 @@ private:
 
   // RID.pageNum can be equal numPages if no enough free space.
   // Need to append a new page in this case.
-  RC insertPos(FileHandle &fileHandle, int length, RID &rid);
+  RC insertPos(FileHandle &fileHandle, unsigned short length, RID &rid);
   // Return num of free bytes in the page.
   unsigned freeSpace(const void *data);
   // Insert record to data.
-  void insert2data(void *data, char *record, unsigned length, int slotNum);
+  void insert2data(void *data, char *record, unsigned short length, int slotNum);
 };
 
 #endif

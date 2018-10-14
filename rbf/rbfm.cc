@@ -11,7 +11,7 @@ vector<bitset<8>> nullIndicators(int size, const void *data) {
     return nullBits;
 }
 
-void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned& length){
+void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned short& length){
     int dataPos = 0;
     int attrNum = recordDescriptor.size();
     int nullIndSize = ceil((double)attrNum/(double)8);
@@ -148,7 +148,7 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    unsigned length = 0;
+    unsigned short length = 0;
     char *record = (char *)data2record(data, recordDescriptor, length);
     RC rc = insertPos(fileHandle, length, rid);
     if (rc) {
@@ -157,9 +157,9 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     void *page = malloc(PAGE_SIZE);
     if (rid.pageNum == fileHandle.getNumberOfPages()) {
         //init the page
-        int zero = 0;
-        memcpy((char *)page + PAGE_SIZE - sizeof(int), &zero, sizeof(int));
-        memcpy((char *)page + PAGE_SIZE - 2 * sizeof(int), &zero, sizeof(int));
+        short zero = 0;
+        memcpy((char *)page + PAGE_SIZE - sizeof(short), &zero, sizeof(short));
+        memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short), &zero, sizeof(short));
         //update the page
         insert2data(page, record, length, rid.slotNum);
         delete[] record;
@@ -192,7 +192,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
         return rc;
     }
     SlotDir slotDir;
-    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(int) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
+    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(short) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
     char *record = new char[slotDir.length];
     memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
     record2data(record, recordDescriptor, data);
@@ -244,7 +244,7 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
     return 0;
 }
 
-RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length, RID &rid) {
+RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);
     int pageNum;
@@ -265,8 +265,8 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length, RID &ri
         rid.slotNum = 1;
     }
     else {
-        memcpy(&rid.slotNum, (char *)data + PAGE_SIZE - 2 * sizeof(int), sizeof(int));
-        rid.slotNum++;
+        memcpy(&rid.slotNum, (char *)data + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
+        rid.slotNum++;//TODO: fix slotNum after deletion
     }
     rid.pageNum = pageNum;
 
@@ -275,26 +275,26 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length, RID &ri
 }
 
 unsigned RecordBasedFileManager::freeSpace(const void *data) {
-    int numSlots;
-    memcpy(&numSlots, (char *)data + PAGE_SIZE - 2 * sizeof(int), sizeof(int));
-    int freeBegin;
-    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
-    int freeEnd = PAGE_SIZE - 2 * sizeof(int) - numSlots * sizeof(SlotDir);
+    short numSlots;
+    memcpy(&numSlots, (char *)data + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
+    short freeBegin;
+    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(short), sizeof(short));
+    int freeEnd = PAGE_SIZE - 2 * sizeof(short) - numSlots * sizeof(SlotDir);
     return freeEnd - freeBegin;
 }
 
-void RecordBasedFileManager::insert2data(void *data, char *record, unsigned length, int slotNum) {
+void RecordBasedFileManager::insert2data(void *data, char *record, unsigned short length, int slotNum) {
     // Insert record.
-    unsigned freeBegin;
-    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
+    unsigned short freeBegin;
+    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(short), sizeof(short));
     memcpy((char *)data + freeBegin, record, length);
     // Insert SoltDir.
     SlotDir slotDir = {freeBegin, length};
-    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(short) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
     // Update free space.
     freeBegin += length;
-    memcpy((char *)data + PAGE_SIZE - sizeof(int), &freeBegin, sizeof(int));
+    memcpy((char *)data + PAGE_SIZE - sizeof(short), &freeBegin, sizeof(short));
     // Update num of slots.
-    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int), &slotNum, sizeof(int));
+    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(short), &slotNum, sizeof(short)); //TODO: fix slotNum
     return;
 }
