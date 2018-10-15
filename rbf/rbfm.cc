@@ -282,11 +282,21 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
     return 0;
 }
 
-unsigned RecordBasedFileManager::freeSpace(const void *data) {
-    short numSlots;
-    memcpy(&numSlots, (char *)data + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
+short RecordBasedFileManager::getFreeBegin(const void* page) {
     short freeBegin;
-    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(short), sizeof(short));
+    memcpy(&freeBegin, (char *)page + PAGE_SIZE - sizeof(short), sizeof(short));
+    return freeBegin;
+}
+
+short RecordBasedFileManager::getNumSlots(const void* page) {
+    short numSlots;
+    memcpy(&numSlots, (char *)page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
+    return numSlots;
+}
+
+unsigned RecordBasedFileManager::freeSpace(const void *data) {
+    short numSlots = getNumSlots(data);
+    short freeBegin = getFreeBegin(data);
     int freeEnd = PAGE_SIZE - 2 * sizeof(short) - numSlots * sizeof(SlotDir);
     return freeEnd - freeBegin;
 }

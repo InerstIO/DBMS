@@ -159,6 +159,10 @@ private:
   void insert2data(void *data, char *record, unsigned short length, int slotNum);
   // Get slotDir from rid and page.
   SlotDir getSlotDir(const RID &rid, const void* page);
+  // Get numSlots in page.
+  short getNumSlots(const void* page);
+  // Get freeBegin in page.
+  short getFreeBegin(const void* page);
 };
 
 #endif
