@@ -157,7 +157,7 @@ private:
   // Return num of free bytes in the page.
   unsigned freeSpace(const void *data);
   // Insert record to data.
-  void insert2data(void *data, char *record, unsigned short length, int slotNum);
+  void insert2data(void *data, char *record, unsigned short length, unsigned slotNum);
   // Get slotDir from rid and page.
   SlotDir getSlotDir(const unsigned slotNum, const void* page);
   // Get numSlots in page.

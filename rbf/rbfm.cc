@@ -347,7 +347,7 @@ void RecordBasedFileManager::setNumSlots(unsigned short numSlots, void* page) {
     return;
 }
 
-void RecordBasedFileManager::insert2data(void *data, char *record, unsigned short length, int slotNum) {
+void RecordBasedFileManager::insert2data(void *data, char *record, unsigned short length, unsigned slotNum) {
     // Insert record.
     unsigned short freeBegin;
     memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(short), sizeof(short));
