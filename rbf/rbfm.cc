@@ -375,7 +375,11 @@ void RecordBasedFileManager::insert2data(void *data, char *record, unsigned shor
     // Update free space.
     freeBegin += length;
     setFreeBegin(freeBegin, data);
-    // Update num of slots.
-    setNumSlots(slotNum, data); //TODO: fix slotNum
+    // Update num of slots.    
+    short numSlots = getNumSlots(data);
+    if ((unsigned short)numSlots == slotNum - 1) {
+        setNumSlots(slotNum, data);
+    }
+
     return;
 }
