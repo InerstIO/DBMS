@@ -164,6 +164,10 @@ private:
   short getNumSlots(const void* page);
   // Get freeBegin in page.
   short getFreeBegin(const void* page);
+  // Set freeBegin in page.
+  void setFreeBegin(unsigned short freeBegin, void* page);
+  // Set numSlots in page.
+  void setNumSlots(unsigned short numSlots, void* page);
 };
 
 #endif

@@ -301,6 +301,16 @@ unsigned RecordBasedFileManager::freeSpace(const void *data) {
     return freeEnd - freeBegin;
 }
 
+void RecordBasedFileManager::setFreeBegin(unsigned short freeBegin, void* page) {
+    memcpy((char *)page + PAGE_SIZE - sizeof(short), &freeBegin, sizeof(short));
+    return;
+}
+
+void RecordBasedFileManager::setNumSlots(unsigned short numSlots, void* page) {
+    memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short), &numSlots, sizeof(short));
+    return;
+}
+
 void RecordBasedFileManager::insert2data(void *data, char *record, unsigned short length, int slotNum) {
     // Insert record.
     unsigned short freeBegin;
@@ -311,8 +321,8 @@ void RecordBasedFileManager::insert2data(void *data, char *record, unsigned shor
     memcpy((char *)data + PAGE_SIZE - 2 * sizeof(short) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
     // Update free space.
     freeBegin += length;
-    memcpy((char *)data + PAGE_SIZE - sizeof(short), &freeBegin, sizeof(short));
+    setFreeBegin(freeBegin, data);
     // Update num of slots.
-    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(short), &slotNum, sizeof(short)); //TODO: fix slotNum
+    setNumSlots(slotNum, data); //TODO: fix slotNum
     return;
 }
