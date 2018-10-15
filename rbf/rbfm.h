@@ -32,6 +32,7 @@ struct Attribute {
 };
 
 struct SlotDir {
+  bool tombstone;
   unsigned short offset;
   unsigned short length;
 };
