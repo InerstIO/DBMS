@@ -292,6 +292,7 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);
     int pageNum;
+    short numSlots;
     
     for (pageNum = curPage; pageNum >= 0; pageNum--)
     {
@@ -300,15 +301,19 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
             return rc;
         }
         if (freeSpace(data) >= length + sizeof(SlotDir)) {
+            numSlots = getNumSlots(data);
             break;
         }
     }
 
     if (pageNum < 0) {
         pageNum = curPage + 1;
+        numSlots = 0;
+        if (PAGE_SIZE < length + sizeof(SlotDir)) {
+            return -1; // the record is too long to fit in an empty page.
+        }
     }
     
-    short numSlots = getNumSlots(data);
     SlotDir slotDir;
     
     for(int i = 1; i <= numSlots; i++)
