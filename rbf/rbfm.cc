@@ -306,12 +306,24 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
 
     if (pageNum < 0) {
         pageNum = curPage + 1;
-        rid.slotNum = 1;
     }
-    else {
-        memcpy(&rid.slotNum, (char *)data + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
-        rid.slotNum++;//TODO: fix slotNum after deletion
+    
+    short numSlots = getNumSlots(data);
+    SlotDir slotDir;
+    
+    for(int i = 1; i <= numSlots; i++)
+    {
+        slotDir = getSlotDir(i, data);
+        
+        if (slotDir.offset == -1) {
+            rid.slotNum = i;
+            rid.pageNum = pageNum;
+            free(data);
+            return 0;
+        }
     }
+
+    rid.slotNum = ++numSlots;
     rid.pageNum = pageNum;
 
     free(data);
