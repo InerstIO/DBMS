@@ -188,9 +188,9 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     return 0;
 }
 
-SlotDir RecordBasedFileManager::getSlotDir(const RID &rid, const void* page) {
+SlotDir RecordBasedFileManager::getSlotDir(const unsigned slotNum, const void* page) {
     SlotDir slotDir;
-    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(short) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
+    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(short) - slotNum * sizeof(SlotDir), sizeof(SlotDir));
     return slotDir;
 }
 
@@ -200,7 +200,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     if (rc) {
         return rc;
     }
-    SlotDir slotDir = getSlotDir(rid, page);
+    SlotDir slotDir = getSlotDir(rid.slotNum, page);
     char *record = new char[slotDir.length];
     memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
     record2data(record, recordDescriptor, data);
