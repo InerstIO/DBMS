@@ -157,9 +157,9 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     void *page = malloc(PAGE_SIZE);
     if (rid.pageNum == fileHandle.getNumberOfPages()) {
         //init the page
-        short zero = 0;
-        memcpy((char *)page + PAGE_SIZE - sizeof(short), &zero, sizeof(short));
-        memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short), &zero, sizeof(short));
+        unsigned short zero = 0;
+        setFreeBegin(zero, page);
+        setNumSlots(zero, page);
         //update the page
         insert2data(page, record, length, rid.slotNum);
         delete[] record;
