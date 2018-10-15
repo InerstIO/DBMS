@@ -164,14 +164,14 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
         insert2data(page, record, length, rid.slotNum);
         delete[] record;
         //append new page
-        int rc = fileHandle.appendPage(page);
+        RC rc = fileHandle.appendPage(page);
         if (rc) {
             return rc;
         }
     }
     else
     {
-        int rc = fileHandle.readPage(rid.pageNum, page);
+        RC rc = fileHandle.readPage(rid.pageNum, page);
         if (rc) {
             return rc;
         }
@@ -196,7 +196,7 @@ SlotDir RecordBasedFileManager::getSlotDir(const unsigned slotNum, const void* p
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     void *page = malloc(PAGE_SIZE);
-    int rc = fileHandle.readPage(rid.pageNum, page);
+    RC rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
         return rc;
     }
@@ -254,7 +254,7 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
 
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
     void *page = malloc(PAGE_SIZE);
-    int rc = fileHandle.readPage(rid.pageNum, page);
+    RC rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
         return rc;
     }
@@ -296,7 +296,7 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
     
     for (pageNum = curPage; pageNum >= 0; pageNum--)
     {
-        int rc = fileHandle.readPage(pageNum, data);
+        RC rc = fileHandle.readPage(pageNum, data);
         if (rc) {
             return rc;
         }
