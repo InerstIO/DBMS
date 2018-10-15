@@ -252,6 +252,42 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
     return 0;
 }
 
+RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
+    void *page = malloc(PAGE_SIZE);
+    int rc = fileHandle.readPage(rid.pageNum, page);
+    if (rc) {
+        return rc;
+    }
+    SlotDir slotDir = getSlotDir(rid.slotNum, page);
+    unsigned short recordLength = slotDir.length;
+    short freeBegin = getFreeBegin(page);
+    short numSlots = getNumSlots(page);
+    
+    if (slotDir.tombstone) {
+        RID realRid;
+        memcpy(&realRid, (char *)page + slotDir.offset, recordLength);
+        rc = deleteRecord(fileHandle, recordDescriptor, realRid);
+        if (rc) {
+            return rc;
+        }
+    }
+
+    memcpy((char *)page + slotDir.offset, (char *)page + slotDir.offset + recordLength, freeBegin - slotDir.offset - recordLength);
+    slotDir.offset = -1;
+    memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short) - rid.slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    
+    for(int i = rid.slotNum+1; i <= numSlots; i++)
+    {
+        slotDir = getSlotDir(i, page);
+        slotDir.offset -= recordLength;
+        memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short) - i * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    }
+    
+    setFreeBegin(freeBegin+recordLength, page);
+    // do not update numSlots because we need that unchanged to find insertion position.
+    return 0;
+}
+
 RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);
