@@ -280,7 +280,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     }
 
     memcpy((char *)page + slotDir.offset, (char *)page + slotDir.offset + recordLength, freeBegin - slotDir.offset - recordLength);
-    slotDir.offset = -1;
+    slotDir.offset = USHRT_MAX;
     memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short) - rid.slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
     
     for(int i = rid.slotNum+1; i <= numSlots; i++)
