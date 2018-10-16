@@ -292,6 +292,12 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     
     setFreeBegin(freeBegin+recordLength, page);
     // do not update numSlots because we need that unchanged to find insertion position.
+
+    //write page
+    rc = fileHandle.writePage(rid.pageNum, page);
+    if (rc) {
+        return rc;
+    }
     return 0;
 }
 
