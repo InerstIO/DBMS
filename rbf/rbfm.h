@@ -170,6 +170,8 @@ private:
   void setNumSlots(unsigned short numSlots, void* page);
   // Set slotDir at slotNum in page.
   void setSlotDir(void* page, unsigned slotNum, SlotDir slotDir);
+  // Update offsets in slotDirs starting from start to numSlots with delta in page.
+  void updateSlotDirOffsets(void* page, unsigned start, short numSlots, unsigned short delta);
 };
 
 #endif

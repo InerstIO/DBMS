@@ -264,10 +264,20 @@ void RecordBasedFileManager::setSlotDir(void* page, unsigned slotNum, SlotDir sl
     return;
 }
 
+void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, short numSlots, unsigned short delta) {
+    for(int i = start; i <= numSlots; i++)
+    {
+        SlotDir slotDir = getSlotDir(i, page);
+        slotDir.offset += delta;
+        setSlotDir(page, i, slotDir);
+    }
+}
+
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
     void *page = malloc(PAGE_SIZE);
     RC rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
+        free(page);
         return rc;
     }
     SlotDir slotDir = getSlotDir(rid.slotNum, page);
@@ -280,6 +290,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
         memcpy(&realRid, (char *)page + slotDir.offset, recordLength);
         rc = deleteRecord(fileHandle, recordDescriptor, realRid);
         if (rc) {
+            free(page);
             return rc;
         }
     }
@@ -288,12 +299,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     slotDir.offset = USHRT_MAX;
     setSlotDir(page, rid.slotNum, slotDir);
     
-    for(int i = rid.slotNum+1; i <= numSlots; i++)
-    {
-        slotDir = getSlotDir(i, page);
-        slotDir.offset -= recordLength;
-        setSlotDir(page, i, slotDir);
-    }
+    updateSlotDirOffsets(page, rid.slotNum+1, numSlots, -recordLength);
     
     setFreeBegin(freeBegin+recordLength, page);
     // do not update numSlots because we need that unchanged to find insertion position.
@@ -301,8 +307,10 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     //write page
     rc = fileHandle.writePage(rid.pageNum, page);
     if (rc) {
+        free(page);
         return rc;
     }
+    free(page);
     return 0;
 }
 
