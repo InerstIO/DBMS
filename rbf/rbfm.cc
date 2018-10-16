@@ -333,7 +333,7 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
     {
         slotDir = getSlotDir(i, data);
         
-        if (slotDir.offset == -1) {
+        if (slotDir.offset == USHRT_MAX) {
             rid.slotNum = i;
             rid.pageNum = pageNum;
             free(data);
