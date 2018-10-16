@@ -198,9 +198,16 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     void *page = malloc(PAGE_SIZE);
     RC rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
+        free(page);
         return rc;
     }
     SlotDir slotDir = getSlotDir(rid.slotNum, page);
+    
+    if (slotDir.offset == USHRT_MAX) {
+        free(page);
+        return -1; // deleted record.
+    }
+    
     char *record = new char[slotDir.length];
     memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
     record2data(record, recordDescriptor, data);
