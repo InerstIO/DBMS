@@ -172,6 +172,8 @@ private:
   void setSlotDir(void* page, unsigned slotNum, SlotDir slotDir);
   // Update offsets in slotDirs starting from start to numSlots with delta in page.
   void updateSlotDirOffsets(void* page, unsigned start, short numSlots, unsigned short delta);
+  // Move records forward by length to destOffset.
+  void moveRecordsForward(void* page, unsigned short destOffset, short freeBegin, unsigned short length);
 };
 
 #endif

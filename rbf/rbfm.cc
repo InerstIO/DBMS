@@ -273,6 +273,11 @@ void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, sh
     }
 }
 
+void RecordBasedFileManager::moveRecordsForward(void* page, unsigned short destOffset, short freeBegin, unsigned short length) {
+    memcpy((char *)page + destOffset, (char *)page + destOffset + length, freeBegin - destOffset - length);
+    return;
+}
+
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
     void *page = malloc(PAGE_SIZE);
     RC rc = fileHandle.readPage(rid.pageNum, page);
@@ -295,7 +300,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
         }
     }
 
-    memcpy((char *)page + slotDir.offset, (char *)page + slotDir.offset + recordLength, freeBegin - slotDir.offset - recordLength);
+    moveRecordsForward(page, slotDir.offset, freeBegin, recordLength);
     slotDir.offset = USHRT_MAX;
     setSlotDir(page, rid.slotNum, slotDir);
     
