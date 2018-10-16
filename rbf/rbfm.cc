@@ -259,6 +259,11 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
     return 0;
 }
 
+void RecordBasedFileManager::setSlotDir(void* page, unsigned slotNum, SlotDir slotDir) {
+    memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    return;
+}
+
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
     void *page = malloc(PAGE_SIZE);
     RC rc = fileHandle.readPage(rid.pageNum, page);
@@ -281,13 +286,13 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
     memcpy((char *)page + slotDir.offset, (char *)page + slotDir.offset + recordLength, freeBegin - slotDir.offset - recordLength);
     slotDir.offset = USHRT_MAX;
-    memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short) - rid.slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    setSlotDir(page, rid.slotNum, slotDir);
     
     for(int i = rid.slotNum+1; i <= numSlots; i++)
     {
         slotDir = getSlotDir(i, page);
         slotDir.offset -= recordLength;
-        memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short) - i * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+        setSlotDir(page, i, slotDir);
     }
     
     setFreeBegin(freeBegin+recordLength, page);
@@ -384,7 +389,7 @@ void RecordBasedFileManager::insert2data(void *data, char *record, unsigned shor
     memcpy((char *)data + freeBegin, record, length);
     // Insert SoltDir.
     SlotDir slotDir = {false, freeBegin, length};
-    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(short) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    setSlotDir(data, slotNum, slotDir);
     // Update free space.
     freeBegin += length;
     setFreeBegin(freeBegin, data);

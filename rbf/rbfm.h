@@ -168,6 +168,8 @@ private:
   void setFreeBegin(unsigned short freeBegin, void* page);
   // Set numSlots in page.
   void setNumSlots(unsigned short numSlots, void* page);
+  // Set slotDir at slotNum in page.
+  void setSlotDir(void* page, unsigned slotNum, SlotDir slotDir);
 };
 
 #endif
