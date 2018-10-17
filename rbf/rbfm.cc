@@ -45,7 +45,8 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, u
                     valLength++;
                 }
             } else{
-                int stringLength = (int)*((char*)data+dataPos)+((int)*((char*)data+dataPos+1)<<8)+((int)*((char*)data+dataPos+2)<<16)+((int)*((char*)data+dataPos+3)<<24);
+                int stringLength;
+                memcpy(&stringLength, (char*)data+dataPos, sizeof(int));
                 dataPos += 4;
                 offset += stringLength;
                 for(int j=0;j<stringLength;j++){
@@ -92,20 +93,22 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
         ((char*)data)[length] = nullIndicator[i];
         length++;
     }
+    int lastPointer = 0;
     for(unsigned i=0;i<recordDescriptor.size();i++){
         if(pointers[i] != -1){
-        if(recordDescriptor[i].type == 2){
-            int l = i>0?pointers[i]-pointers[i-1]:pointers[i];
-            memcpy((char*)data+length, &l, sizeof(int));
-            length += 4;
-            memcpy((char*)data+length, (char*)record+pos, l);
-            length += l;
-            pos += l;
-        } else{
-            memcpy((char*)data+length, (char*)record+pos, 4);
-            length += 4;
-            pos += 4;
-        }
+            if(recordDescriptor[i].type == 2){
+                int l = pointers[i]-lastPointer;
+                memcpy((char*)data+length, &l, sizeof(int));
+                length += 4;
+                memcpy((char*)data+length, (char*)record+pos, l);
+                length += l;
+                pos += l;
+            } else{
+                memcpy((char*)data+length, (char*)record+pos, 4);
+                length += 4;
+                pos += 4;
+            }
+            lastPointer = pointers[i];
         }
     }
 }
