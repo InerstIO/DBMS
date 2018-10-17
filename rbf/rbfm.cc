@@ -302,7 +302,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     
     if (slotDir.tombstone) {
         RID realRid;
-        memcpy(&realRid, (char *)page + slotDir.offset, recordLength);
+        getRecord(&realRid, slotDir, page);
         rc = deleteRecord(fileHandle, recordDescriptor, realRid);
         if (rc) {
             free(page);
