@@ -264,7 +264,7 @@ void RecordBasedFileManager::setSlotDir(void* page, unsigned slotNum, SlotDir sl
     return;
 }
 
-void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, short numSlots, unsigned short delta) {
+void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta) {
     for(int i = start; i <= numSlots; i++)
     {
         SlotDir slotDir = getSlotDir(i, page);
@@ -274,8 +274,8 @@ void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, sh
     return;
 }
 
-void RecordBasedFileManager::moveRecords(void* page, unsigned short destOffset, short freeBegin, unsigned short delta) {
     memcpy((char *)page + destOffset, (char *)page + destOffset - delta, freeBegin - destOffset + delta);
+void RecordBasedFileManager::moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta) {
     return;
 }
 
