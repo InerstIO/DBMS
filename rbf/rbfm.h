@@ -174,6 +174,8 @@ private:
   void updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta);
   // Move records by delta to destOffset. If delta is positive, move to right, else to left.
   void moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta);
+  // Get record related to slotDir in page.
+  void getRecord(void* record, SlotDir slotDir, void* page);
 };
 
 #endif
