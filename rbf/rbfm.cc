@@ -288,7 +288,6 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     }
     SlotDir slotDir = getSlotDir(rid.slotNum, page);
     unsigned short recordLength = slotDir.length;
-    short freeBegin = getFreeBegin(page);
     short numSlots = getNumSlots(page);
     
     if (slotDir.tombstone) {
@@ -299,8 +298,17 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
             free(page);
             return rc;
         }
+        // Handle a rare situation that new record is on the same page as the tombstone.
+        if (realRid.pageNum == rid.pageNum) {
+            rc = fileHandle.readPage(rid.pageNum, page);
+            if (rc) {
+                free(page);
+                return rc;
+            }
+        }
     }
 
+    short freeBegin = getFreeBegin(page);
     moveRecords(page, slotDir.offset, freeBegin, -recordLength);
     slotDir.offset = USHRT_MAX;
     setSlotDir(page, rid.slotNum, slotDir);
