@@ -176,6 +176,9 @@ private:
   void moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta);
   // Get record related to slotDir in page.
   void getRecord(void* record, SlotDir slotDir, void* page);
+  // Set record in page.
+  void setRecord(void* page, void* record, SlotDir slotDir);
+
 };
 
 #endif

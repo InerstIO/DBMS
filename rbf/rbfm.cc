@@ -338,6 +338,10 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     return 0;
 }
 
+void RecordBasedFileManager::setRecord(void* page, void* record, SlotDir slotDir) {
+    memcpy((char *)page + slotDir.offset, record, slotDir.length);
+    return;
+}
 RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);
@@ -415,13 +419,13 @@ void RecordBasedFileManager::setNumSlots(unsigned short numSlots, void* page) {
 }
 
 void RecordBasedFileManager::insert2data(void *data, char *record, unsigned short length, unsigned slotNum) {
-    // Insert record.
     unsigned short freeBegin;
     memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(short), sizeof(short));
-    memcpy((char *)data + freeBegin, record, length);
     // Insert SoltDir.
     SlotDir slotDir = {false, freeBegin, length};
     setSlotDir(data, slotNum, slotDir);
+    // Insert record.
+    setRecord(data, record, slotDir);
     // Update free space.
     freeBegin += length;
     setFreeBegin(freeBegin, data);
