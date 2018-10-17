@@ -271,10 +271,11 @@ void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, sh
         slotDir.offset += delta;
         setSlotDir(page, i, slotDir);
     }
+    return;
 }
 
-void RecordBasedFileManager::moveRecordsForward(void* page, unsigned short destOffset, short freeBegin, unsigned short length) {
-    memcpy((char *)page + destOffset, (char *)page + destOffset + length, freeBegin - destOffset - length);
+void RecordBasedFileManager::moveRecords(void* page, unsigned short destOffset, short freeBegin, unsigned short delta) {
+    memcpy((char *)page + destOffset, (char *)page + destOffset - delta, freeBegin - destOffset + delta);
     return;
 }
 
@@ -300,7 +301,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
         }
     }
 
-    moveRecordsForward(page, slotDir.offset, freeBegin, recordLength);
+    moveRecords(page, slotDir.offset, freeBegin, -recordLength);
     slotDir.offset = USHRT_MAX;
     setSlotDir(page, rid.slotNum, slotDir);
     
