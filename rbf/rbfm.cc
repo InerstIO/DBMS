@@ -274,8 +274,8 @@ void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, sh
     return;
 }
 
-    memcpy((char *)page + destOffset, (char *)page + destOffset - delta, freeBegin - destOffset + delta);
 void RecordBasedFileManager::moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta) {
+    memmove((char *)page + destOffset, (char *)page + destOffset - delta, freeBegin - destOffset + delta);
     return;
 }
 
