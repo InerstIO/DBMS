@@ -153,6 +153,8 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
     unsigned short length = 0;
     char *record = (char *)data2record(data, recordDescriptor, length);
+    // leave at least sizeof(RID) space to make tomestone possible
+    length = max(length, (unsigned short)sizeof(RID));
     RC rc = insertPos(fileHandle, length, rid);
     if (rc) {
         return rc;
