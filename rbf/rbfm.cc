@@ -218,6 +218,17 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
         return -1; // deleted record.
     }
     
+    if (slotDir.tombstone) {
+        RID realRid;
+        getRecord(&realRid, slotDir, page);
+        RC rc = fileHandle.readPage(realRid.pageNum, page);
+        if (rc) {
+            free(page);
+            return rc;
+        }
+        slotDir = getSlotDir(realRid.slotNum, page);
+    }
+    
     char *record = new char[slotDir.length];
     getRecord(record, slotDir, page);
     record2data(record, recordDescriptor, data);
