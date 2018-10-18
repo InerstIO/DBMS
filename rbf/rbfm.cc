@@ -353,6 +353,117 @@ void RecordBasedFileManager::setRecord(void* page, void* record, SlotDir slotDir
     memcpy((char *)page + slotDir.offset, record, slotDir.length);
     return;
 }
+
+RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
+    unsigned short newLength = 0;
+    void *page = malloc(PAGE_SIZE);
+    RC rc = fileHandle.readPage(rid.pageNum, page);
+    if (rc) {
+        free(page);
+        return rc;
+    }
+    SlotDir slotDir = getSlotDir(rid.slotNum, page);
+    char *record = (char *)data2record(data, recordDescriptor, newLength);
+    
+    bool tombstone = slotDir.tombstone;
+    if (tombstone) { //TODO: test this block! Not covered in test cases.
+        /*
+        1. get realRid
+        2. 
+            if realRid.pageNum has enough freeSpace
+                updateRecord(..., realRid)
+            else
+                updateRecord(..., realRid)
+                get tombstone record(newRid) on realPage
+                delete the tombstone record in realPage
+                set the tombstone record in current page to newRid
+        */
+        RID realRid;
+        getRecord(&realRid, slotDir, page);
+        void* realPage = malloc(PAGE_SIZE);
+        RC rc = fileHandle.readPage(realRid.pageNum, realPage);
+        if (rc) {
+            free(page);
+            delete[] record;
+            free(realPage);
+            return rc;
+        }
+        SlotDir realSlotDir = getSlotDir(realRid.slotNum, realPage);
+        if (freeSpace(realPage) + realSlotDir.length >= newLength) {
+            updateRecord(fileHandle, recordDescriptor, data, realRid);
+        }
+        else {
+            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            RID newRid;
+            getRecord(&newRid, realSlotDir, realPage);
+            deleteRecord(fileHandle, recordDescriptor, realRid);
+            setRecord(page, &newRid, slotDir);
+        }
+        free(realPage);
+    }
+    else
+    {
+        if (slotDir.length == newLength) {
+            setRecord(page, record, slotDir);
+        }
+        // have enough freeSpace
+        else if(freeSpace(page) + slotDir.length >= newLength) {
+            unsigned short length = slotDir.length;
+            slotDir.length = newLength;
+            setSlotDir(page, rid.slotNum, slotDir);
+            short freeBegin = getFreeBegin(page);
+            moveRecords(page, slotDir.offset + newLength, freeBegin, newLength - length);
+            setFreeBegin(freeBegin - length + newLength, page);
+            short numSlots = getNumSlots(page);
+            updateSlotDirOffsets(page, rid.slotNum+1, numSlots, newLength-length);
+            setRecord(page, record, slotDir);
+        }
+        else {
+            /*
+            1. find a new position (rid)
+            2. update old record to rid
+            3. update slotDir.length&tombstone & set slotDir
+            4. move records forward if length different
+            5. update slotDir offsets if length different
+            6. update freeBegin if length different
+            7. insert in new position
+            */
+            RID newRid;
+            RC rc = insertPos(fileHandle, newLength, newRid);
+            if (rc) {
+                free(page);
+                delete[] record;
+                return rc;
+            }
+            unsigned short length = slotDir.length;
+            slotDir.length = sizeof(RID);
+            slotDir.tombstone = true;
+            setSlotDir(page, rid.slotNum, slotDir);
+            setRecord(page, &newRid, slotDir);
+            short freeBegin = getFreeBegin(page);
+            
+            if (length != sizeof(RID)) {
+                moveRecords(page, slotDir.offset + sizeof(RID), freeBegin, sizeof(RID) - length);
+                short numSlots = getNumSlots(page);
+                updateSlotDirOffsets(page, rid.slotNum + 1, numSlots, sizeof(RID)-length);
+                setFreeBegin(freeBegin -length + sizeof(RID), page);
+            }
+
+            insertRecord(fileHandle, recordDescriptor, data, newRid);
+        }
+    }
+    // write page
+    rc = fileHandle.writePage(rid.pageNum, page);
+    if (rc) {
+        free(page);
+        delete[] record;
+        return rc;
+    }
+    free(page);
+    delete[] record;
+    return 0;
+}
+
 RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);
