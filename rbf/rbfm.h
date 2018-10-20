@@ -178,7 +178,8 @@ private:
   void getRecord(void* record, SlotDir slotDir, void* page);
   // Set record in page.
   void setRecord(void* page, void* record, SlotDir slotDir);
-
+  // Get real page and slotDir from rid.
+  RC getPageSlotDir(FileHandle &fileHandle, const RID &rid, void* page, SlotDir* slotDirPtr);
 };
 
 #endif

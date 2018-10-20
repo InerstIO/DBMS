@@ -206,34 +206,45 @@ void RecordBasedFileManager::getRecord(void* record, SlotDir slotDir, void* page
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     void *page = malloc(PAGE_SIZE);
-    RC rc = fileHandle.readPage(rid.pageNum, page);
+    SlotDir* slotDir = new SlotDir;
+    RC rc = getPageSlotDir(fileHandle, rid, page, slotDir);
     if (rc) {
         free(page);
+        delete slotDir;
+        return rc;
+    }
+    
+    char *record = new char[slotDir->length];
+    getRecord(record, *slotDir, page);
+    record2data(record, recordDescriptor, data);
+    free(page);
+    delete slotDir;
+    delete[] record;
+    return 0;
+}
+
+RC RecordBasedFileManager::getPageSlotDir(FileHandle &fileHandle, const RID &rid, void* page, SlotDir* slotDirPtr) {
+    RC rc = fileHandle.readPage(rid.pageNum, page);
+    if (rc) {
         return rc;
     }
     SlotDir slotDir = getSlotDir(rid.slotNum, page);
     
     if (slotDir.offset == USHRT_MAX) {
-        free(page);
         return -1; // deleted record.
     }
-    
+
     if (slotDir.tombstone) {
         RID realRid;
         getRecord(&realRid, slotDir, page);
         RC rc = fileHandle.readPage(realRid.pageNum, page);
         if (rc) {
-            free(page);
             return rc;
         }
         slotDir = getSlotDir(realRid.slotNum, page);
     }
-    
-    char *record = new char[slotDir.length];
-    getRecord(record, slotDir, page);
-    record2data(record, recordDescriptor, data);
-    free(page);
-    delete[] record;
+
+    memcpy(slotDirPtr, &slotDir, sizeof(SlotDir));
     return 0;
 }
 
