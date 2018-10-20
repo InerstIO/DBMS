@@ -475,6 +475,49 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
     return 0;
 }
 
+RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data) {
+    /*
+    1. get record
+    2. get attribute id
+    3. read attribute
+    */
+    void *page = malloc(PAGE_SIZE);
+    SlotDir* slotDir = new SlotDir;
+    RC rc = getPageSlotDir(fileHandle, rid, page, slotDir);
+    if (rc) {
+        free(page);
+        delete slotDir;
+        return rc;
+    }
+    
+    char *record = new char[slotDir->length];
+    getRecord(record, *slotDir, page);
+
+    unsigned i;
+    for(i = 0; i < recordDescriptor.size(); i++)
+    {
+        if (recordDescriptor[i].name == attributeName) {
+            break;
+        }
+    }
+
+    short startAddr;
+    short endAddr;
+    memcpy(&startAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * i, SIZE_FIELD_POINTER);
+    if (i < recordDescriptor.size() - 1) {
+        memcpy(&endAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * (i + 1), SIZE_FIELD_POINTER);
+        endAddr--;
+    }
+    else {
+        endAddr = slotDir->length - 1;
+    }
+    short attrLength = endAddr - startAddr + 1;
+    
+    memcpy(data, record + startAddr, attrLength);
+
+    return 0;
+}
+
 RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);

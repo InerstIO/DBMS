@@ -11,6 +11,9 @@
 
 #include "../rbf/pfm.h"
 
+#define SIZE_NUM_FIELDS 4
+#define SIZE_FIELD_POINTER 2
+
 using namespace std;
 
 // Record ID
