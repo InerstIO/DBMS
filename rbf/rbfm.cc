@@ -571,7 +571,7 @@ short RecordBasedFileManager::getFreeBegin(const void* page) {
     return freeBegin;
 }
 
-short RecordBasedFileManager::getNumSlots(const void* page) {
+short getNumSlots(const void* page) {
     short numSlots;
     memcpy(&numSlots, (char *)page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
     return numSlots;
