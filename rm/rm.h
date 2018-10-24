@@ -72,7 +72,17 @@ public:
 protected:
   RelationManager();
   ~RelationManager();
+private:
+    string tableFileName = "Tables.tbl";
+    string columnFileName = "Columns.tbl";
+    RecordBasedFileManager rbfm;
+    vector<Attribute> tableAttr;
+    vector<Attribute> columnAttr;
+    FileHandle fileHandle;
 
+    RC generateTableRecord(int tableId, string tableName, string fileName, void* data, int& length);
+    RC generateColumnRecord(int tableId, string columnName, int columnType, int columnLength, int columnPos, void* data, int& length);
+    RC insertTupleHelper(const string &tableName, vector<Attribute>& attributes, const void* data, RID& rid);
 };
 
 #endif
