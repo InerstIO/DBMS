@@ -518,6 +518,16 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
     return 0;
 }
 
+RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
+    rbfm_ScanIterator.fileHandle = fileHandle;
+    rbfm_ScanIterator.recordDescriptor = recordDescriptor;
+    rbfm_ScanIterator.conditionAttribute = conditionAttribute;
+    rbfm_ScanIterator.compOp = compOp;
+    rbfm_ScanIterator.value = (void *)value;
+    rbfm_ScanIterator.attributeNames = attributeNames;
+    return 0;
+}
+
 RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);

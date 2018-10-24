@@ -72,14 +72,26 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() {};
-  ~RBFM_ScanIterator() {};
+  RBFM_ScanIterator();
+  ~RBFM_ScanIterator();
 
   // Never keep the results in the memory. When getNextRecord() is called, 
   // a satisfying record needs to be fetched from the file.
   // "data" follows the same format as RecordBasedFileManager::insertRecord().
   RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
   RC close() { return -1; };
+  FileHandle fileHandle;
+  vector<Attribute> recordDescriptor;
+  string conditionAttribute;
+  CompOp compOp;
+  void *value;
+  vector<string> attributeNames;
+
+private:
+  RC getNextRid(RID &rid);
+  int numSlots;
+  int numPages;
+  RID nextRid;
 };
 
 // Get numSlots in page.
