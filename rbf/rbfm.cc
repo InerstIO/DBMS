@@ -519,10 +519,10 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 }
 
 RBFM_ScanIterator::RBFM_ScanIterator() {
-    numPages = fileHandle.getNumberOfPages();
+    numPages = fileHandle->getNumberOfPages();
     nextRid.pageNum = 0;
     void *page = malloc(PAGE_SIZE);
-    RC rc = fileHandle.readPage(nextRid.pageNum, page);
+    RC rc = fileHandle->readPage(nextRid.pageNum, page);
     if (rc) {
         free(page);
         return;
@@ -548,7 +548,7 @@ RC RBFM_ScanIterator::getNextRid(RID &rid) {
 }
 
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
-    rbfm_ScanIterator.fileHandle = fileHandle;
+    rbfm_ScanIterator.fileHandle = &fileHandle;
     rbfm_ScanIterator.recordDescriptor = recordDescriptor;
     rbfm_ScanIterator.conditionAttribute = conditionAttribute;
     rbfm_ScanIterator.compOp = compOp;

@@ -80,7 +80,7 @@ public:
   // "data" follows the same format as RecordBasedFileManager::insertRecord().
   RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
   RC close() { return -1; };
-  FileHandle fileHandle;
+  FileHandle* fileHandle;
   vector<Attribute> recordDescriptor;
   string conditionAttribute;
   CompOp compOp;
