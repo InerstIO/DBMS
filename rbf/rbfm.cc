@@ -532,6 +532,21 @@ RBFM_ScanIterator::RBFM_ScanIterator() {
     free(page);
 }
 
+RC RBFM_ScanIterator::getNextRid(RID &rid) {
+    if (nextRid.pageNum >= numPages) {
+        return RBFM_EOF;
+    }
+    if (nextRid.slotNum > numSlots) {
+        nextRid.pageNum++;
+        nextRid.slotNum = 1;
+        getNextRid(rid);
+    }
+    rid.pageNum = nextRid.pageNum;
+    rid.slotNum = nextRid.slotNum;
+    nextRid.slotNum++;
+    return 0;
+}
+
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
     rbfm_ScanIterator.fileHandle = fileHandle;
     rbfm_ScanIterator.recordDescriptor = recordDescriptor;
