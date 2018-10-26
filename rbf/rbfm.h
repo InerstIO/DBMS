@@ -158,7 +158,8 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
 
   // Get numSlots in page.
   static short getNumSlots(const void* page);
-
+  // Get slotDir from rid and page.
+  static SlotDir getSlotDir(const unsigned slotNum, const void* page);
 public:
 
 protected:
@@ -175,8 +176,6 @@ private:
   unsigned freeSpace(const void *data);
   // Insert record to data.
   void insert2data(void *data, char *record, unsigned short length, unsigned slotNum);
-  // Get slotDir from rid and page.
-  SlotDir getSlotDir(const unsigned slotNum, const void* page);
   // Get freeBegin in page.
   short getFreeBegin(const void* page);
   // Set freeBegin in page.
