@@ -160,6 +160,8 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
   static short getNumSlots(const void* page);
   // Get slotDir from rid and page.
   static SlotDir getSlotDir(const unsigned slotNum, const void* page);
+  // Get record related to slotDir in page.
+  static void getRecord(void* record, SlotDir slotDir, void* page);
 public:
 
 protected:
@@ -188,8 +190,6 @@ private:
   void updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta);
   // Move records by delta to destOffset. If delta is positive, move to right, else to left.
   void moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta);
-  // Get record related to slotDir in page.
-  void getRecord(void* record, SlotDir slotDir, void* page);
   // Set record in page.
   void setRecord(void* page, void* record, SlotDir slotDir);
   // Get real page and slotDir from rid.
