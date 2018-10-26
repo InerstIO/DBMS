@@ -92,6 +92,7 @@ private:
   int numSlots;
   int numPages;
   RID nextRid;
+  void* loadedPage;
 };
 
 class RecordBasedFileManager
