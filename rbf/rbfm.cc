@@ -527,7 +527,7 @@ RBFM_ScanIterator::RBFM_ScanIterator() {
         free(page);
         return;
     }
-    numSlots = getNumSlots(page);
+    numSlots = RecordBasedFileManager::getNumSlots(page);
     nextRid.slotNum = 1;
     free(page);
 }
@@ -610,7 +610,7 @@ short RecordBasedFileManager::getFreeBegin(const void* page) {
     return freeBegin;
 }
 
-short getNumSlots(const void* page) {
+short RecordBasedFileManager::getNumSlots(const void* page) {
     short numSlots;
     memcpy(&numSlots, (char *)page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
     return numSlots;

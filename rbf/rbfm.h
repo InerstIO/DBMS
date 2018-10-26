@@ -94,9 +94,6 @@ private:
   RID nextRid;
 };
 
-// Get numSlots in page.
-short getNumSlots(const void* page);
-
 class RecordBasedFileManager
 {
 public:
@@ -158,6 +155,9 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
       const void *value,                    // used in the comparison
       const vector<string> &attributeNames, // a list of projected attributes
       RBFM_ScanIterator &rbfm_ScanIterator);
+
+  // Get numSlots in page.
+  static short getNumSlots(const void* page);
 
 public:
 
