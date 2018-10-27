@@ -493,6 +493,12 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
     char *record = new char[slotDir->length];
     getRecord(record, *slotDir, page);
 
+    readAttributeFromRecord(record, slotDir->length, recordDescriptor, attributeName, data);
+
+    return 0;
+}
+
+RC RecordBasedFileManager::readAttributeFromRecord(void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
     unsigned i;
     for(i = 0; i < recordDescriptor.size(); i++)
     {
@@ -503,16 +509,20 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 
     short startAddr;
     short endAddr;
-    memcpy(&startAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * i, SIZE_FIELD_POINTER);
-    if (i < recordDescriptor.size() - 1) {
-        memcpy(&endAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * (i + 1), SIZE_FIELD_POINTER);
-        endAddr--;
+    memcpy(&endAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * i, SIZE_FIELD_POINTER);
+    if (endAddr == -1) {
+        ;//TODO: Null condition
+    }
+    if (i > 0) {
+        memcpy(&startAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * (i - 1), SIZE_FIELD_POINTER);
+        //TODO: Also need to consider previous is null condition.
+        startAddr++;
     }
     else {
-        endAddr = slotDir->length - 1;
+        startAddr = sizeof(int) + sizeof(short) * recordDescriptor.size() + 1;
     }
     short attrLength = endAddr - startAddr + 1;
-    
+
     memcpy(data, record + startAddr, attrLength);
 
     return 0;
