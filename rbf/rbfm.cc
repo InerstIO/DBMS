@@ -562,6 +562,32 @@ RC RBFM_ScanIterator::getNextRid(RID &rid) {
     return 0;
 }
 
+RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    SlotDir slotDir;
+    do
+    {
+        getNextRid(rid);
+        fileHandle->readPage(rid.pageNum, loadedPage);
+        slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
+    } while (!slotDir.tombstone);
+    char *record = new char[slotDir.length]; //TODO: delete[]
+    rbfm->getRecord(record, slotDir, loadedPage);
+
+    unsigned i;
+    for(i = 0; i < recordDescriptor.size(); i++)
+    {
+        if (recordDescriptor[i].name == conditionAttribute) {
+            break;
+        }
+    }
+
+    void* recordData = malloc(recordDescriptor[i].length); //TODO: free
+    memset(recordData, 0, recordDescriptor[i].length);
+    rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, recordData);
+    
+}
+
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
     rbfm_ScanIterator.fileHandle = &fileHandle;
     rbfm_ScanIterator.recordDescriptor = recordDescriptor;
