@@ -519,6 +519,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 }
 
 RBFM_ScanIterator::RBFM_ScanIterator() {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     numPages = fileHandle->getNumberOfPages();
     nextRid.pageNum = 0;
     loadedPage = malloc(PAGE_SIZE); //TODO: free when close()
@@ -526,11 +527,12 @@ RBFM_ScanIterator::RBFM_ScanIterator() {
     if (rc) {
         return;
     }
-    numSlots = RecordBasedFileManager::getNumSlots(loadedPage);
+    numSlots = rbfm->getNumSlots(loadedPage);
     nextRid.slotNum = 1;
 }
 
 RC RBFM_ScanIterator::getNextRid(RID &rid) {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     if (nextRid.pageNum >= numPages) {
         return RBFM_EOF;
     }
@@ -540,7 +542,7 @@ RC RBFM_ScanIterator::getNextRid(RID &rid) {
         if (rc) {
             return -1;
         }
-        numSlots = RecordBasedFileManager::getNumSlots(loadedPage);
+        numSlots = rbfm->getNumSlots(loadedPage);
         nextRid.slotNum = 1;
         getNextRid(rid);
     }

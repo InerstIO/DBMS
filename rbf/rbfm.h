@@ -158,11 +158,11 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
       RBFM_ScanIterator &rbfm_ScanIterator);
 
   // Get numSlots in page.
-  static short getNumSlots(const void* page);
+  short getNumSlots(const void* page);
   // Get slotDir from rid and page.
-  static SlotDir getSlotDir(const unsigned slotNum, const void* page);
+  SlotDir getSlotDir(const unsigned slotNum, const void* page);
   // Get record related to slotDir in page.
-  static void getRecord(void* record, SlotDir slotDir, void* page);
+  void getRecord(void* record, SlotDir slotDir, void* page);
 public:
 
 protected:
