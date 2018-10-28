@@ -4,6 +4,8 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
+#include <map>
 
 #include "../rbf/rbfm.h"
 
@@ -69,7 +71,7 @@ public:
   RC dropAttribute(const string &tableName, const string &attributeName);
 
 
-protected:
+//protected:
   RelationManager();
   ~RelationManager();
 private:

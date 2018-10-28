@@ -69,6 +69,7 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 //    process the data;
 //  }
 //  rbfmScanIterator.close();
+class RecordBasedFileManager;
 
 class RBFM_ScanIterator {
 public:
@@ -78,6 +79,7 @@ public:
   // Never keep the results in the memory. When getNextRecord() is called, 
   // a satisfying record needs to be fetched from the file.
   // "data" follows the same format as RecordBasedFileManager::insertRecord().
+  RecordBasedFileManager* rbfm;// = RecordBasedFileManager::instance();;
   RC getNextRecord(RID &rid, void *data);
   RC close() { return -1; };
   FileHandle* fileHandle;
@@ -86,8 +88,6 @@ public:
   CompOp compOp;
   void *value;
   vector<string> attributeNames;
-
-private:
   RC getNextRid(RID &rid);
   int numSlots;
   int numPages;
@@ -100,7 +100,7 @@ class RecordBasedFileManager
 public:
   static RecordBasedFileManager* instance();
 
-  PagedFileManager* pfm;
+  PagedFileManager* pfm = PagedFileManager::instance();
 
   int curPage;
   int curSlot;
@@ -166,7 +166,7 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
   void getRecord(void* record, SlotDir slotDir, void* page);
 public:
 
-protected:
+//protected:
   RecordBasedFileManager();
   ~RecordBasedFileManager();
 
