@@ -141,7 +141,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     cout<<"fuck1"<<endl;
     void* data = malloc(1000);
     memset(data, 0, 1000);
-    while(rbfmIter.getNextRecord(rid, data)){
+    while(!rbfmIter.getNextRecord(rid, data)){
         int id;
         memcpy(&id, (char*)data+1, sizeof(int));
         //cout<<"userId: "<<id<<endl;
