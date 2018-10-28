@@ -72,16 +72,28 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() {};
-  ~RBFM_ScanIterator() {};
+  RBFM_ScanIterator();
+  ~RBFM_ScanIterator();
 
   // Never keep the results in the memory. When getNextRecord() is called, 
   // a satisfying record needs to be fetched from the file.
   // "data" follows the same format as RecordBasedFileManager::insertRecord().
-  RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
+  RC getNextRecord(RID &rid, void *data);
   RC close() { return -1; };
-};
+  FileHandle* fileHandle;
+  vector<Attribute> recordDescriptor;
+  string conditionAttribute;
+  CompOp compOp;
+  void *value;
+  vector<string> attributeNames;
 
+private:
+  RC getNextRid(RID &rid);
+  int numSlots;
+  int numPages;
+  RID nextRid;
+  void* loadedPage;
+};
 
 class RecordBasedFileManager
 {
@@ -136,6 +148,7 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
 
   RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data);
 
+  RC readAttributeFromRecord(void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data);
   // Scan returns an iterator to allow the caller to go through the results one by one. 
   RC scan(FileHandle &fileHandle,
       const vector<Attribute> &recordDescriptor,
@@ -145,6 +158,12 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
       const vector<string> &attributeNames, // a list of projected attributes
       RBFM_ScanIterator &rbfm_ScanIterator);
 
+  // Get numSlots in page.
+  short getNumSlots(const void* page);
+  // Get slotDir from rid and page.
+  SlotDir getSlotDir(const unsigned slotNum, const void* page);
+  // Get record related to slotDir in page.
+  void getRecord(void* record, SlotDir slotDir, void* page);
 public:
 
 protected:
@@ -161,10 +180,6 @@ private:
   unsigned freeSpace(const void *data);
   // Insert record to data.
   void insert2data(void *data, char *record, unsigned short length, unsigned slotNum);
-  // Get slotDir from rid and page.
-  SlotDir getSlotDir(const unsigned slotNum, const void* page);
-  // Get numSlots in page.
-  short getNumSlots(const void* page);
   // Get freeBegin in page.
   short getFreeBegin(const void* page);
   // Set freeBegin in page.
@@ -177,8 +192,6 @@ private:
   void updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta);
   // Move records by delta to destOffset. If delta is positive, move to right, else to left.
   void moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta);
-  // Get record related to slotDir in page.
-  void getRecord(void* record, SlotDir slotDir, void* page);
   // Set record in page.
   void setRecord(void* page, void* record, SlotDir slotDir);
   // Get real page and slotDir from rid.

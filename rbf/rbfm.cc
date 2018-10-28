@@ -493,6 +493,12 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
     char *record = new char[slotDir->length];
     getRecord(record, *slotDir, page);
 
+    readAttributeFromRecord(record, slotDir->length, recordDescriptor, attributeName, data);
+
+    return 0;
+}
+
+RC RecordBasedFileManager::readAttributeFromRecord(void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
     unsigned i;
     for(i = 0; i < recordDescriptor.size(); i++)
     {
@@ -503,18 +509,92 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 
     short startAddr;
     short endAddr;
-    memcpy(&startAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * i, SIZE_FIELD_POINTER);
-    if (i < recordDescriptor.size() - 1) {
-        memcpy(&endAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * (i + 1), SIZE_FIELD_POINTER);
-        endAddr--;
+    memcpy(&endAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * i, SIZE_FIELD_POINTER);
+    if (endAddr == -1) {
+        ;//TODO: Null condition
+    }
+    if (i > 0) {
+        memcpy(&startAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * (i - 1), SIZE_FIELD_POINTER);
+        //TODO: Also need to consider previous is null condition.
+        startAddr++;
     }
     else {
-        endAddr = slotDir->length - 1;
+        startAddr = sizeof(int) + sizeof(short) * recordDescriptor.size() + 1;
     }
     short attrLength = endAddr - startAddr + 1;
-    
+
     memcpy(data, record + startAddr, attrLength);
 
+    return 0;
+}
+
+RBFM_ScanIterator::RBFM_ScanIterator() {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    numPages = fileHandle->getNumberOfPages();
+    nextRid.pageNum = 0;
+    loadedPage = malloc(PAGE_SIZE); //TODO: free when close()
+    RC rc = fileHandle->readPage(nextRid.pageNum, loadedPage);
+    if (rc) {
+        return;
+    }
+    numSlots = rbfm->getNumSlots(loadedPage);
+    nextRid.slotNum = 1;
+}
+
+RC RBFM_ScanIterator::getNextRid(RID &rid) {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    if (nextRid.pageNum >= numPages) {
+        return RBFM_EOF;
+    }
+    if (nextRid.slotNum > numSlots) {
+        nextRid.pageNum++;
+        RC rc = fileHandle->readPage(nextRid.pageNum, loadedPage);
+        if (rc) {
+            return -1;
+        }
+        numSlots = rbfm->getNumSlots(loadedPage);
+        nextRid.slotNum = 1;
+        getNextRid(rid);
+    }
+    rid.pageNum = nextRid.pageNum;
+    rid.slotNum = nextRid.slotNum;
+    nextRid.slotNum++;
+    return 0;
+}
+
+RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    SlotDir slotDir;
+    do
+    {
+        getNextRid(rid);
+        fileHandle->readPage(rid.pageNum, loadedPage);
+        slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
+    } while (!slotDir.tombstone);
+    char *record = new char[slotDir.length]; //TODO: delete[]
+    rbfm->getRecord(record, slotDir, loadedPage);
+
+    unsigned i;
+    for(i = 0; i < recordDescriptor.size(); i++)
+    {
+        if (recordDescriptor[i].name == conditionAttribute) {
+            break;
+        }
+    }
+
+    void* recordData = malloc(recordDescriptor[i].length); //TODO: free
+    memset(recordData, 0, recordDescriptor[i].length);
+    rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, recordData);
+    
+}
+
+RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
+    rbfm_ScanIterator.fileHandle = &fileHandle;
+    rbfm_ScanIterator.recordDescriptor = recordDescriptor;
+    rbfm_ScanIterator.conditionAttribute = conditionAttribute;
+    rbfm_ScanIterator.compOp = compOp;
+    rbfm_ScanIterator.value = (void *)value;
+    rbfm_ScanIterator.attributeNames = attributeNames;
     return 0;
 }
 
