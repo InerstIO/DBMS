@@ -581,7 +581,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         }
         fileHandle->readPage(rid.pageNum, loadedPage);
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
-    } while (!slotDir.tombstone);
+    } while (slotDir.tombstone);
     char *record = new char[slotDir.length]; //TODO: delete[]
     rbfm->getRecord(record, slotDir, loadedPage);
 
