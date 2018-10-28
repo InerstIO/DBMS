@@ -500,56 +500,65 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 
 RC RecordBasedFileManager::readAttributeFromRecord(void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
     unsigned i;
+    short startAddr = sizeof(short)*recordDescriptor.size();
+    short endAddr = startAddr;
+    bool isNull = false;
     for(i = 0; i < recordDescriptor.size(); i++)
     {
+        short pointer;
+        memcpy(&pointer, (char*)record+i*sizeof(short), sizeof(short));
         if (recordDescriptor[i].name == attributeName) {
+            if(pointer == -1){
+                isNull = true;
+            } else{
+                startAddr = endAddr;
+                endAddr = pointer;
+            }
             break;
+        } else{
+            if(pointer != -1){
+                startAddr = endAddr;
+                endAddr = pointer;
+            }
         }
     }
 
-    short startAddr;
-    short endAddr;
-    memcpy(&endAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * i, SIZE_FIELD_POINTER);
-    if (endAddr == -1) {
-        ;//TODO: Null condition
+    char nullIndicator;
+    if(isNull){
+        nullIndicator = 0;
+    } else{
+        nullIndicator = 128;
     }
-    if (i > 0) {
-        memcpy(&startAddr, record + SIZE_NUM_FIELDS + SIZE_FIELD_POINTER * (i - 1), SIZE_FIELD_POINTER);
-        //TODO: Also need to consider previous is null condition.
-        startAddr++;
+    ((char*)data)[0] = nullIndicator;
+    if(recordDescriptor[i].type == 2){
+        int length = endAddr-startAddr;
+        memcpy((char*)data+1, &length, sizeof(int));
+        memcpy((char*)data+5, (char*)record+startAddr, length);
+    } else{
+        memcpy((char*)data+1, (char*)record+startAddr, 4);
     }
-    else {
-        startAddr = sizeof(int) + sizeof(short) * recordDescriptor.size() + 1;
-    }
-    short attrLength = endAddr - startAddr + 1;
-
-    memcpy(data, record + startAddr, attrLength);
-
     return 0;
 }
 
 RBFM_ScanIterator::RBFM_ScanIterator() {
-    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
-    numPages = fileHandle->getNumberOfPages();
-    nextRid.pageNum = 0;
-    loadedPage = malloc(PAGE_SIZE); //TODO: free when close()
-    RC rc = fileHandle->readPage(nextRid.pageNum, loadedPage);
-    if (rc) {
-        return;
-    }
-    numSlots = rbfm->getNumSlots(loadedPage);
-    nextRid.slotNum = 1;
+}
+
+RBFM_ScanIterator::~RBFM_ScanIterator(){
+    free(value);
+    free(loadedPage);
 }
 
 RC RBFM_ScanIterator::getNextRid(RID &rid) {
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    cout<<"getNextRid: "<<nextRid.slotNum<<", "<<numSlots<<endl;
     if (nextRid.pageNum >= numPages) {
         return RBFM_EOF;
     }
     if (nextRid.slotNum > numSlots) {
         nextRid.pageNum++;
         RC rc = fileHandle->readPage(nextRid.pageNum, loadedPage);
-        if (rc) {
+        if (rc != SUCCESS) {
+            cout<<"readpage fail"<<endl;
             return -1;
         }
         numSlots = rbfm->getNumSlots(loadedPage);
@@ -567,7 +576,9 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     SlotDir slotDir;
     do
     {
-        getNextRid(rid);
+        if(getNextRid(rid) == RBFM_EOF){
+            return RBFM_EOF;
+        }
         fileHandle->readPage(rid.pageNum, loadedPage);
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
     } while (!slotDir.tombstone);
@@ -582,10 +593,293 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         }
     }
 
-    void* recordData = malloc(recordDescriptor[i].length); //TODO: free
-    memset(recordData, 0, recordDescriptor[i].length);
-    rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, recordData);
-    
+    int conditionDataLength = 1;
+    if(recordDescriptor[i].type == 2){
+        conditionDataLength += 4;
+    }
+    conditionDataLength += recordDescriptor[i].length;
+    void* conditionData = malloc(conditionDataLength);//TODO: free
+    memset(conditionData, 0, conditionDataLength);
+    rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
+    char nullInd;
+    memcpy(&nullInd, (char*)conditionData, 1);
+    if(compOp==0){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val == *(int*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val == *(float*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val == *(string*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            return -1;
+        }
+    } else if(compOp==1){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val < *(int*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val < *(float*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val < *(string*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            return -1;
+        }
+    } else if(compOp==2){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val <= *(int*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val <= *(float*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val <= *(string*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            return -1;
+        }
+    } else if(compOp==3){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val > *(int*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val > *(float*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val > *(string*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            return -1;
+        }
+    } else if(compOp==4){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val >= *(int*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val >= *(float*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val >= *(string*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            return -1;
+        }
+    } else if(compOp==5){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val != *(int*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val != *(float*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val != *(string*)(value)){
+                    record2data((void*)record, recordDescriptor, data);
+                    return 0;
+                } else{
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(compOp == 6){
+            record2data((void*)record, recordDescriptor, data);
+            return 0;
+        }else{
+            return -1;
+        }
+    } else{
+        return -1;
+    }
+    return 0;
 }
 
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
@@ -595,6 +889,22 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
     rbfm_ScanIterator.compOp = compOp;
     rbfm_ScanIterator.value = (void *)value;
     rbfm_ScanIterator.attributeNames = attributeNames;
+    cout<<"c1"<<endl;
+    rbfm_ScanIterator.rbfm = RecordBasedFileManager::instance();
+    rbfm_ScanIterator.numPages = rbfm_ScanIterator.fileHandle->getNumberOfPages();
+    cout<<"c3: "<<rbfm_ScanIterator.fileHandle->getNumberOfPages()<<endl;
+    rbfm_ScanIterator.nextRid.pageNum = 0;
+    rbfm_ScanIterator.loadedPage = malloc(PAGE_SIZE); //TODO: free when close()
+    cout<<"c4"<<endl;
+    cout<<rbfm_ScanIterator.nextRid.pageNum<<endl;
+    RC rc = rbfm_ScanIterator.fileHandle->readPage(rbfm_ScanIterator.nextRid.pageNum, rbfm_ScanIterator.loadedPage);
+    if (rc != SUCCESS) {
+        cout<<"fail: "<<rc<<endl;
+        return rc;
+    }
+    cout<<"c5"<<endl;
+    rbfm_ScanIterator.numSlots = rbfm_ScanIterator.rbfm->getNumSlots(rbfm_ScanIterator.loadedPage);
+    rbfm_ScanIterator.nextRid.slotNum = 1;
     return 0;
 }
 
