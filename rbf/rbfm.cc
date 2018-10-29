@@ -534,6 +534,11 @@ RC RecordBasedFileManager::readAttributeFromRecord(void* record, unsigned short 
         }
     }
 //cout<<"address: "<<startAddr<<", "<<endAddr<<endl;
+    
+    if (i == recordDescriptor.size()) {
+        return -1;
+    }
+    
     char nullIndicator;
     if(isNull){
         nullIndicator = 0;
