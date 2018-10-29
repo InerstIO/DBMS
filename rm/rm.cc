@@ -250,6 +250,8 @@ RC RelationManager::deleteTable(const string &tableName)
     }
     rbfm->closeFile(fileHandle);
     rbfmIter.close();
+    free(data);
+    free(record);
     return SUCCESS;
 }
 
