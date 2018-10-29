@@ -460,9 +460,9 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
-    FileHandle fileHandle;
+    /*FileHandle fileHandle;
     rm_ScanIterator.rm = RelationManager::instance();
-    rm_ScanIterator.rbfmIter.rbfm = RecordBasedFileManager::instance();
+    rm_ScanIterator.rbfmIter.rbfm = rbfm;
     vector<Attribute> recordDescriptor;
     rm_ScanIterator.rm->getAttributes(tableName, recordDescriptor);
     rbfm->openFile(tableName, fileHandle);
@@ -470,7 +470,7 @@ RC RelationManager::scan(const string &tableName,
     rm_ScanIterator.rbfmIter.recordDescriptor = recordDescriptor;
     rm_ScanIterator.rbfmIter.conditionAttribute = conditionAttribute;
     rm_ScanIterator.rbfmIter.compOp = compOp;
-    rm_ScanIterator.rbfmIter.value = (void *)value;
+    rm_ScanIterator.rbfmIter.value = value;
     rm_ScanIterator.rbfmIter.attributeNames = attributeNames;
     //cout<<"c1"<<endl;
     rm_ScanIterator.rbfmIter.numPages = rm_ScanIterator.rbfmIter.fileHandle->getNumberOfPages();
@@ -487,17 +487,29 @@ RC RelationManager::scan(const string &tableName,
     rbfm->closeFile(fileHandle);
     //cout<<"c5"<<endl;
     rm_ScanIterator.rbfmIter.numSlots = rm_ScanIterator.rbfmIter.rbfm->getNumSlots(rm_ScanIterator.rbfmIter.loadedPage);
-    rm_ScanIterator.rbfmIter.nextRid.slotNum = 1;
+    rm_ScanIterator.rbfmIter.nextRid.slotNum = 1;*/
+
+    FileHandle fileHandle;
+    rm_ScanIterator.rm = RelationManager::instance();
+    //rm_ScanIterator.rbfmIter.rbfm = rbfm;
+    vector<Attribute> recordDescriptor;
+    rm_ScanIterator.rm->getAttributes(tableName, recordDescriptor);
+    cout<<"getAttributes: "<<recordDescriptor.size()<<endl;
+    rbfm->openFile(tableName, fileHandle);
+    //RC rc = rm_ScanIterator.rbfmIter.fileHandle->readPage(rm_ScanIterator.rbfmIter.nextRid.pageNum, rm_ScanIterator.rbfmIter.loadedPage);
+    rbfm->scan(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames, rm_ScanIterator.rbfmIter);
+    rbfm->closeFile(fileHandle);
     return 0;
 }
 
 RC RM_ScanIterator::getNextTuple(RID &rid, void *data){
-    rbfmIter.getNextRecord(rid, data);
+    cout<<"getNextTuple"<<endl;
+    return rbfmIter.getNextRecord(rid, data);
 }
 
 RC RM_ScanIterator::close(){
     //rbfmIter.rbfm->closeFile(fileHandle);
-    rbfmIter.close();
+    return rbfmIter.close();
 }
 
 // Extra credit work

@@ -86,7 +86,7 @@ public:
   vector<Attribute> recordDescriptor;
   string conditionAttribute;
   CompOp compOp;
-  void *value;
+  const void *value;
   vector<string> attributeNames;
   RC getNextRid(RID &rid);
   int numSlots;

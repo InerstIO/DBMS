@@ -19,7 +19,6 @@ public:
   RM_ScanIterator() {};
   ~RM_ScanIterator() {};
   RBFM_ScanIterator rbfmIter;
-  FileHandle fileHandle;
   RelationManager* rm;
   // "data" follows the same format as RelationManager::insertTuple()
   RC getNextTuple(RID &rid, void *data);
