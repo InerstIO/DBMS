@@ -516,7 +516,9 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 //record2data(record, recordDescriptor, d);
 //printRecord(recordDescriptor, d);
     readAttributeFromRecord(record, slotDir->length, recordDescriptor, attributeName, data);
+    delete[] record;
     free(page);
+    delete slotDir;
     return 0;
 }
 
