@@ -333,7 +333,6 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
             attr.length = l;
             attrMap[position] = attr;
         }
-        //free(data);
     }
     free(data);
     rbfm.closeFile(fileHandle);
