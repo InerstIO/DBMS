@@ -16,26 +16,26 @@ RelationManager::RelationManager()
     tableID.type = TypeInt;
     tableID.length = 4;
     Attribute tableName;
-    tableName.name = "table_name";
+    tableName.name = "table-name";
     tableName.type = TypeVarChar;
     tableName.length = 50;
     Attribute fileName;
-    fileName.name = "file_name";
+    fileName.name = "file-name";
     fileName.type = TypeVarChar;
     fileName.length = 50;
     tableAttr.push_back(tableID);
     tableAttr.push_back(tableName);
     tableAttr.push_back(fileName);
     Attribute columnName = tableName;
-    columnName.name = "column_name";
+    columnName.name = "column-name";
     Attribute columnType;
-    columnType.name = "column_type";
+    columnType.name = "column-type";
     columnType.type = TypeInt;
     columnType.length = 4;
     Attribute columnLength = columnType;
-    columnLength.name = "column_length";
+    columnLength.name = "column-length";
     Attribute columnPosition = columnType;
-    columnPosition.name = "column_position";
+    columnPosition.name = "column-position";
     columnAttr.push_back(tableID);
     columnAttr.push_back(columnName);
     columnAttr.push_back(columnType);
@@ -53,8 +53,8 @@ RC RelationManager::createCatalog()
     RC rc1 = rbfm.createFile(tableFileName);
     RC rc2 = rbfm.createFile(columnFileName);
     if(rc1==SUCCESS && rc2==SUCCESS){
-        void* data = malloc(1000);
-        memset(data, 0, 1000);
+        void* data = malloc(4000);
+        memset(data, 0, 4000);
         int length = 0;
         RID rid;
         //cout<<"fuck1"<<endl;
@@ -62,47 +62,47 @@ RC RelationManager::createCatalog()
         if(rct != SUCCESS) return -1;
         //rbfm.printRecord(tableAttr, data);
         insertTupleHelper(tableFileName, tableAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
+        length = 0;memset(data, 0, 4000);
         rct = generateTableRecord(2, "Columns", columnFileName, data, length);
         //cout<<"fuck2"<<endl;
         if(rct != SUCCESS) return -1;
         insertTupleHelper(tableFileName, tableAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
+        length = 0;memset(data, 0, 4000);
         //cout<<"fuck3"<<endl;
-        RC rcc = generateColumnRecord(1, "table_id", TypeInt, 4, 1, data, length);
+        RC rcc = generateColumnRecord(1, "table-id", TypeInt, 4, 1, data, length);
         if(rcc != SUCCESS) return -1;
         //cout<<"hyx"<<endl;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
+        length = 0;memset(data, 0, 4000);
         //cout<<"fuck4"<<endl;
-        rcc = generateColumnRecord(1, "table_name", TypeVarChar, 50, 2, data, length);
+        rcc = generateColumnRecord(1, "table-name", TypeVarChar, 50, 2, data, length);
         if(rcc != SUCCESS) return -1;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
-        rcc = generateColumnRecord(1, "file_name", TypeVarChar, 50, 3, data, length);
+        length = 0;memset(data, 0, 4000);
+        rcc = generateColumnRecord(1, "file-name", TypeVarChar, 50, 3, data, length);
         if(rcc != SUCCESS) return -1;
         //cout<<"fuck5"<<endl;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
-        rcc = generateColumnRecord(2, "table_id", TypeInt, 4, 1, data, length);
+        length = 0;memset(data, 0, 4000);
+        rcc = generateColumnRecord(2, "table-id", TypeInt, 4, 1, data, length);
         if(rcc != SUCCESS) return -1;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
-        rcc = generateColumnRecord(2, "column_name", TypeVarChar, 50, 2, data, length);
+        length = 0;memset(data, 0, 4000);
+        rcc = generateColumnRecord(2, "column-name", TypeVarChar, 50, 2, data, length);
         if(rcc != SUCCESS) return -1;
         //cout<<"fuck6"<<endl;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
-        rcc = generateColumnRecord(2, "column_type", TypeInt, 4, 3, data, length);
+        length = 0;memset(data, 0, 4000);
+        rcc = generateColumnRecord(2, "column-type", TypeInt, 4, 3, data, length);
         if(rcc != SUCCESS) return -1;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
-        rcc = generateColumnRecord(2, "column_length", TypeInt, 4, 4, data, length);
+        length = 0;memset(data, 0, 4000);
+        rcc = generateColumnRecord(2, "column-length", TypeInt, 4, 4, data, length);
         if(rcc != SUCCESS) return -1;
         //cout<<"fuck7"<<endl;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
-        length = 0;memset(data, 0, 1000);
-        rcc = generateColumnRecord(2, "column_position", TypeInt, 4, 5, data, length);
+        length = 0;memset(data, 0, 4000);
+        rcc = generateColumnRecord(2, "column-position", TypeInt, 4, 5, data, length);
         if(rcc != SUCCESS) return -1;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
         free(data);
@@ -133,19 +133,19 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     RBFM_ScanIterator rbfmIter;// = RBFM_ScanIterator();
     //cout<<"2333"<<endl;
     vector<string> targetAttr;
-    targetAttr.push_back("table_id");
+    targetAttr.push_back("table-id");
     //cout<<"fuck0"<<endl;
     RC rc = rbfm.scan(fileHandle, tableAttr, "", NO_OP, NULL, targetAttr, rbfmIter);
     RID rid;
     //cout<<"fuck1"<<endl;
-    void* data = malloc(1000);
-    memset(data, 0, 1000);
+    void* data = malloc(4000);
+    memset(data, 0, 4000);
     while(!rbfmIter.getNextRecord(rid, data)){
         int id;
         memcpy(&id, (char*)data+1, sizeof(int));
         //cout<<"userId: "<<id<<endl;
         usedIds.insert(id);
-        memset(data, 0, 1000);
+        memset(data, 0, 4000);
     }
     //cout<<"fuck2"<<endl;
     //cout<<"userId size: "<<usedIds.size()<<endl;
@@ -168,7 +168,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         Attribute attr = attrs[i];
        // cout<<attr.length<<endl;
         length = 0;
-        memset(data,0,1000);
+        memset(data,0,4000);
         rc = generateColumnRecord(tableId, attr.name, attr.type, (int)attr.length, i+1, data, length);
         if(rc != SUCCESS) return -1;
         //rbfm.printRecord(columnAttr, data);
@@ -191,12 +191,12 @@ RC RelationManager::deleteTable(const string &tableName)
     RC rc = rbfm.scan(fileHandle, tableAttr, "", NO_OP, NULL, tableAttrStr, rbfmIter);
     if(rc != SUCCESS) return -1;
     RID rid;
-    void* data = malloc(1000);
-    void* record = malloc(1000);
+    void* data = malloc(4000);
+    void* record = malloc(4000);
     int table_id = -1;
     //cout<<"del1"<<endl;
     while(!rbfmIter.getNextRecord(rid, record)){
-        rbfm.readAttribute(fileHandle, tableAttr, rid, "table_name", data);
+        rbfm.readAttribute(fileHandle, tableAttr, rid, "table-name", data);
         int length;
         memcpy(&length, (char*)data+1, sizeof(int));
         //cout<<"length: "<<length<<endl;
@@ -214,20 +214,21 @@ RC RelationManager::deleteTable(const string &tableName)
             isTableSame = false;
         }
         if(isTableSame){
-            memset(data,0,1000);
-            rbfm.readAttribute(fileHandle, tableAttr, rid, "table_id", data);
+            memset(data,0,4000);
+            rbfm.readAttribute(fileHandle, tableAttr, rid, "table-id", data);
             memcpy(&table_id, (char*)data+1, sizeof(int));
             rbfm.deleteRecord(fileHandle, tableAttr, rid);
             break;
         }
-        memset(data, 0, 1000);
-        memset(record,0,1000);
+        memset(data, 0, 4000);
+        memset(record,0,4000);
     }
     //cout<<"del2"<<endl;
     rbfm.closeFile(fileHandle);
     rbfm.openFile(columnFileName, fileHandle);
+    rbfmIter.close();
     vector<string> attrs;
-    attrs.push_back("table_id");
+    attrs.push_back("table-id");
     rc = rbfm.scan(fileHandle, columnAttr, "", NO_OP, NULL, attrs, rbfmIter);
     if(rc != SUCCESS) return -1;
     //cout<<"del3"<<endl;
@@ -241,6 +242,7 @@ RC RelationManager::deleteTable(const string &tableName)
         }
     }
     rbfm.closeFile(fileHandle);
+    rbfmIter.close();
     return SUCCESS;
 }
 
@@ -256,8 +258,8 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     //cout<<"getA1"<<endl;
     if(rc != SUCCESS) {cout<<"fail"<<endl;return -1;}
     //cout<<"getA2"<<endl;
-    void* data = malloc(1000);
-    memset(data,0,1000);
+    void* data = malloc(4000);
+    memset(data,0,4000);
     RID rid;
     int tableId = -1;
     while(!rbfmIter.getNextRecord(rid, data)){
@@ -277,7 +279,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
             tableId = id;
             break;
         }
-        memset(data,0,1000);
+        memset(data,0,4000);
     }
     if(tableId <= 0){
         free(data);
@@ -349,13 +351,13 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     if(rc != SUCCESS) return rc;
     //cout<<"t2"<<endl;
     //cout<<"tableName: "<<tableName<<endl;
-    rc = rbfm.openFile(tableName, fileHandle);
-    if(rc != SUCCESS) return rc;
     cout<<"t3"<<endl;
     for(int i=0;i<attrs.size();i++){
         cout<<attrs[i].name<<": "<<attrs[i].type<<", "<<attrs[i].length<<endl;
     }
     rbfm.printRecord(attrs, data);
+    rc = rbfm.openFile(tableName, fileHandle);
+    if(rc != SUCCESS) return rc;
     rc = rbfm.insertRecord(fileHandle, attrs, data, rid);
     if(rc != SUCCESS) return rc;
     //cout<<"t4"<<endl;
@@ -479,8 +481,8 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data){
 }
 
 RC RM_ScanIterator::close(){
-    rbfmIter.close();
     rbfmIter.rbfm->closeFile(fileHandle);
+    rbfmIter.close();
 }
 
 // Extra credit work

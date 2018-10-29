@@ -77,8 +77,8 @@ public:
   RelationManager();
   ~RelationManager();
 private:
-    string tableFileName = "Tables.tbl";
-    string columnFileName = "Columns.tbl";
+    string tableFileName = "Tables";
+    string columnFileName = "Columns";
     RecordBasedFileManager rbfm;
     vector<Attribute> tableAttr;
     vector<Attribute> columnAttr;

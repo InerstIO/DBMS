@@ -158,6 +158,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     //cout<<"test"<<endl;
     RC rc = insertPos(fileHandle, length, rid);
     if (rc != SUCCESS) {
+        delete[] record;
         return rc;
     }
     void *page = malloc(PAGE_SIZE);
@@ -181,6 +182,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     {
         RC rc = fileHandle.readPage(rid.pageNum, page);
         if (rc != SUCCESS) {
+            delete[] record;
             free(page);
             return rc;
         }
@@ -561,8 +563,6 @@ RBFM_ScanIterator::RBFM_ScanIterator() {
 }
 
 RBFM_ScanIterator::~RBFM_ScanIterator(){
-    free(value);
-    free(loadedPage);
 }
 
 RC RBFM_ScanIterator::close(){
@@ -1080,6 +1080,7 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
     {
         RC rc = fileHandle.readPage(pageNum, data);
         if (rc != SUCCESS) {
+            free(data);
             return rc;
         }
         if (freeSpace(data) >= length + sizeof(SlotDir)) {
@@ -1092,6 +1093,7 @@ RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short leng
         pageNum = curPage + 1;
         numSlots = 0;
         if (PAGE_SIZE < length + sizeof(SlotDir)) {
+            free(data);
             return -1; // the record is too long to fit in an empty page.
         }
     }
