@@ -280,6 +280,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         memset(data,0,1000);
     }
     if(tableId <= 0){
+        free(data);
         return -1;
     }
     rbfm.closeFile(fileHandle);
@@ -331,6 +332,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         }
         //free(data);
     }
+    free(data);
     rbfm.closeFile(fileHandle);
     for(auto it=attrMap.begin();it!=attrMap.end();it++){
         attrs.push_back(it->second);
