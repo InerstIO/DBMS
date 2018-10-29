@@ -138,7 +138,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     //cout<<"fuck0"<<endl;
     RC rc = rbfm.scan(fileHandle, tableAttr, "", NO_OP, NULL, targetAttr, rbfmIter);
     RID rid;
-    cout<<"fuck1"<<endl;
+    //cout<<"fuck1"<<endl;
     void* data = malloc(1000);
     memset(data, 0, 1000);
     while(!rbfmIter.getNextRecord(rid, data)){
@@ -148,7 +148,8 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         usedIds.insert(id);
         memset(data, 0, 1000);
     }
-    cout<<"fuck2"<<endl;
+    //cout<<"fuck2"<<endl;
+    //cout<<"userId size: "<<usedIds.size()<<endl;
     int tableId;
     for(int i=1;i<INT_MAX;i++){
         if(usedIds.find(i) == usedIds.end()){
@@ -157,17 +158,21 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         }
     }
     rbfm.closeFile(fileHandle);
-    cout<<"fuck3"<<endl;
+    //cout<<"fuck3"<<endl;
     int length = 0;
     rc = generateTableRecord(tableId, tableName, tableName, data, length);
     if(rc != SUCCESS) return -1;
     insertTupleHelper(tableFileName, tableAttr, data, rid);
     length = 0;
+    cout<<tableName<<": "<<attrs.size()<<endl;
     for(int i=0;i<attrs.size();i++){
         Attribute attr = attrs[i];
+        cout<<attr.length<<endl;
         length = 0;
-        rc = generateColumnRecord(tableId, attrs[i].name, attr.type, attr.length, i+1, data, length);
+        memset(data,0,1000);
+        rc = generateColumnRecord(tableId, attr.name, attr.type, (int)attr.length, i+1, data, length);
         if(rc != SUCCESS) return -1;
+        rbfm.printRecord(columnAttr, data);
         insertTupleHelper(columnFileName, columnAttr, data, rid);
     }
     free(data);
@@ -189,7 +194,7 @@ RC RelationManager::deleteTable(const string &tableName)
     RID rid;
     void* data;
     int table_id = -1;
-    while(rbfmIter.getNextRecord(rid, data)){
+    while(!rbfmIter.getNextRecord(rid, data)){
         rbfm.readAttribute(fileHandle, tableAttr, rid, tableName, data);
         char* d = (char*)data;
         int length;
@@ -222,7 +227,7 @@ RC RelationManager::deleteTable(const string &tableName)
     attrs.push_back("table_id");
     rc = rbfm.scan(fileHandle, columnAttr, "", NO_OP, NULL, attrs, rbfmIter);
     if(rc != SUCCESS) return -1;
-    while(rbfmIter.getNextRecord(rid, data)){
+    while(!rbfmIter.getNextRecord(rid, data)){
         int id;
         char* d = (char*)data;
         memcpy(&id, d+1, sizeof(int));
@@ -239,69 +244,80 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 {
     RBFM_ScanIterator rbfmIter;
     vector<string> tableAttrStr;
+    //cout<<"attr1"<<endl;
     for(int i=0;i<tableAttr.size();i++){
         tableAttrStr.push_back(tableAttr[i].name);
     }
+    //cout<<"attr2"<<endl;
+    rbfm.closeFile(fileHandle);
+    rbfm.openFile(tableFileName, fileHandle);
     RC rc = rbfm.scan(fileHandle, tableAttr, "", NO_OP, NULL, tableAttrStr, rbfmIter);
     if(rc != SUCCESS) return -1;
-    void* data;
+    void* data = malloc(1000);
+    memset(data,0,1000);
     RID rid;
-    int pos = 1;
     int tableId = -1;
-    while(rbfmIter.getNextRecord(rid, data)){
-        char* d = (char*)data;
+    while(!rbfmIter.getNextRecord(rid, data)){
+        int pos = 1;
+        //cout<<"fuck"<<endl;
+        rbfm.printRecord(tableAttr, data);
         int id;
-        memcpy(&id, d+pos, sizeof(int));
+        memcpy(&id, (char*)data+pos, sizeof(int));
         pos += 4;
         int length;
-        memcpy(&length, d+pos, sizeof(int));
+        memcpy(&length, (char*)data+pos, sizeof(int));
         pos += 4;
         string name;
         for(int i=0;i<length;i++){
-            name.push_back(*(d+pos));
+            name.push_back(*((char*)data+pos));
             pos++;
         }
         if(name == tableName){
             tableId = id;
             break;
         }
-        free(data);
+        memset(data,0,1000);
     }
     if(tableId <= 0){
+        //cout<<"tableId: "<<tableId<<endl;
         return -1;
     }
+    //cout<<"attr3"<<endl;
     rbfm.closeFile(fileHandle);
     rbfm.openFile(columnFileName, fileHandle);
     vector<string> columnAttrStr;
     for(int i=0;i<columnAttr.size();i++){
         columnAttrStr.push_back(columnAttr[i].name);
     }
+    //cout<<"attr4"<<endl;
     rc = rbfm.scan(fileHandle, columnAttr, "", NO_OP, NULL, columnAttrStr, rbfmIter);
     if(rc!=SUCCESS) return -1;
     map<int, Attribute> attrMap;
-    while(rbfmIter.getNextRecord(rid, data)){
-        pos = 1;
-        char* d = (char*)data;
+    while(!rbfmIter.getNextRecord(rid, data)){
+        int pos = 1;
+        //char* d = (char*)data;
         int id;
-        memcpy(&id, d+pos, sizeof(int));
+        memcpy(&id, (char*)data+pos, sizeof(int));
         pos+=4;
+                    cout<<"col records:"<<endl;
+            rbfm.printRecord(columnAttr, data);
         if(id == tableId){
             int length;
-            memcpy(&length, d+pos, sizeof(int));
+            memcpy(&length, (char*)data+pos, sizeof(int));
             pos += 4;
             string colName;
             for(int i=0;i<length;i++){
-                colName.push_back(*(d+pos));
+                colName.push_back(*((char*)data+pos));
                 pos++;
             }
             int type;
-            memcpy(&type, d+pos, sizeof(int));
+            memcpy(&type, (char*)data+pos, sizeof(int));
             pos += 4;
             int l;
-            memcpy(&l, d+pos, sizeof(int));
+            memcpy(&l, (char*)data+pos, sizeof(int));
             pos += 4;
             int position;
-            memcpy(&position, d+pos, sizeof(int));
+            memcpy(&position, (char*)data+pos, sizeof(int));
             pos += 4;
             Attribute attr;
             attr.name = colName;
@@ -315,8 +331,9 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
             attr.length = l;
             attrMap[position] = attr;
         }
-        free(data);
+        //free(data);
     }
+    //cout<<"attr5"<<endl;
     for(auto it=attrMap.begin();it!=attrMap.end();it++){
         attrs.push_back(it->second);
     }
@@ -454,7 +471,7 @@ RC RelationManager::generateTableRecord(int tableId, string tableName, string fi
         length += 4;
         memcpy((char*)data+length, fileName.data(), fileName.size());
         length += fileName.size();
-        cout<<"generateTableRecord"<<endl;
+        //cout<<"generateTableRecord"<<endl;
         //cout<<tableName<<endl;
         //rbfm.printRecord(tableAttr, data);
         return SUCCESS;
@@ -471,8 +488,8 @@ RC RelationManager::generateColumnRecord(int tableId, string columnName, int col
         length += 1;
         memcpy((char*)data+length, &tableId, sizeof(int));
         length += 4;
-        int columnLength = columnName.size();
-        memcpy((char*)data+length, &columnLength, sizeof(int));
+        int colNameLength = columnName.size();
+        memcpy((char*)data+length, &colNameLength, sizeof(int));
         length += 4;
         memcpy((char*)data+length, columnName.data(), columnName.size());
         length += columnName.size();
