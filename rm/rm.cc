@@ -49,7 +49,7 @@ RelationManager::~RelationManager()
 
 RC RelationManager::createCatalog()
 {
-    cout<<"createCatalog"<<endl;
+    //cout<<"createCatalog"<<endl;
     RC rc1 = rbfm.createFile(tableFileName);
     RC rc2 = rbfm.createFile(columnFileName);
     if(rc1==SUCCESS && rc2==SUCCESS){
@@ -164,15 +164,15 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     if(rc != SUCCESS) return -1;
     insertTupleHelper(tableFileName, tableAttr, data, rid);
     length = 0;
-    cout<<tableName<<": "<<attrs.size()<<endl;
+    //cout<<tableName<<": "<<attrs.size()<<endl;
     for(int i=0;i<attrs.size();i++){
         Attribute attr = attrs[i];
-        cout<<attr.length<<endl;
+       // cout<<attr.length<<endl;
         length = 0;
         memset(data,0,1000);
         rc = generateColumnRecord(tableId, attr.name, attr.type, (int)attr.length, i+1, data, length);
         if(rc != SUCCESS) return -1;
-        rbfm.printRecord(columnAttr, data);
+        //rbfm.printRecord(columnAttr, data);
         insertTupleHelper(columnFileName, columnAttr, data, rid);
     }
     free(data);
@@ -260,7 +260,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     while(!rbfmIter.getNextRecord(rid, data)){
         int pos = 1;
         //cout<<"fuck"<<endl;
-        rbfm.printRecord(tableAttr, data);
+        //rbfm.printRecord(tableAttr, data);
         int id;
         memcpy(&id, (char*)data+pos, sizeof(int));
         pos += 4;
@@ -299,8 +299,8 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         int id;
         memcpy(&id, (char*)data+pos, sizeof(int));
         pos+=4;
-                    cout<<"col records:"<<endl;
-            rbfm.printRecord(columnAttr, data);
+                    //cout<<"col records:"<<endl;
+            //rbfm.printRecord(columnAttr, data);
         if(id == tableId){
             int length;
             memcpy(&length, (char*)data+pos, sizeof(int));
@@ -334,6 +334,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         //free(data);
     }
     //cout<<"attr5"<<endl;
+    rbfm.closeFile(fileHandle);
     for(auto it=attrMap.begin();it!=attrMap.end();it++){
         attrs.push_back(it->second);
     }
@@ -343,12 +344,22 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
 {
     vector<Attribute> attrs;
+    //cout<<"t1"<<endl;
     RC rc = getAttributes(tableName, attrs);
     if(rc != SUCCESS) return rc;
+    //cout<<"t2"<<endl;
+    //rbfm.closeFile(fileHandle);
+    //cout<<"tableName: "<<tableName<<endl;
     rc = rbfm.openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
+    //cout<<"t3"<<endl;
+    //for(int i=0;i<attrs.size();i++){
+    //    cout<<attrs[i].name<<": "<<attrs[i].type<<", "<<attrs[i].length<<endl;
+    //}
+    //rbfm.printRecord(attrs, data);
     rc = rbfm.insertRecord(fileHandle, attrs, data, rid);
     if(rc != SUCCESS) return rc;
+    //cout<<"t4"<<endl;
     //free(data);
     rc = rbfm.closeFile(fileHandle);
     if(rc != SUCCESS) return rc;
@@ -418,12 +429,17 @@ RC RelationManager::printTuple(const vector<Attribute> &attrs, const void *data)
 RC RelationManager::readAttribute(const string &tableName, const RID &rid, const string &attributeName, void *data)
 {
     RC rc = rbfm.openFile(tableName, fileHandle);
+    cout<<"read1"<<endl;
     if(rc != SUCCESS) return rc;
+    cout<<"read2"<<endl;
     vector<Attribute> attrs;
     rc = getAttributes(tableName, attrs);
+    cout<<"read3"<<endl;
     if(rc != SUCCESS) return rc;
+    cout<<"read4"<<endl;
     rc = rbfm.readAttribute(fileHandle, attrs, rid, attributeName, data);
     if(rc != SUCCESS) return rc;
+    cout<<"read5"<<endl;
     rc = rbfm.closeFile(fileHandle);
     return rc;
 }
