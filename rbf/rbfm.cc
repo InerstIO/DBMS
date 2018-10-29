@@ -162,6 +162,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
         return rc;
     }
     void *page = malloc(PAGE_SIZE);
+    memset(page,0,PAGE_SIZE);
     //cout<<"insert record: "<<rid.pageNum<<", "<<fileHandle.getNumberOfPages()<<endl;
     if (rid.pageNum == fileHandle.getNumberOfPages()) {
         //init the page
@@ -320,6 +321,7 @@ void RecordBasedFileManager::moveRecords(void* page, unsigned short destOffset, 
 
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
     void *page = malloc(PAGE_SIZE);
+    memset(page,0,PAGE_SIZE);
     RC rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
         free(page);
@@ -375,6 +377,7 @@ void RecordBasedFileManager::setRecord(void* page, void* record, SlotDir slotDir
 RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
     unsigned short newLength = 0;
     void *page = malloc(PAGE_SIZE);
+    memset(page,0,PAGE_SIZE);
     RC rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
         free(page);
@@ -399,6 +402,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         RID realRid;
         getRecord(&realRid, slotDir, page);
         void* realPage = malloc(PAGE_SIZE);
+        memset(realPage,0,PAGE_SIZE);
         RC rc = fileHandle.readPage(realRid.pageNum, realPage);
         if (rc) {
             free(page);
@@ -566,7 +570,7 @@ RBFM_ScanIterator::~RBFM_ScanIterator(){
 }
 
 RC RBFM_ScanIterator::close(){
-    free(value);
+    //free(value);
     free(loadedPage);
     return SUCCESS;
 }
@@ -597,7 +601,7 @@ RC RBFM_ScanIterator::getNextRid(RID &rid) {
 }
 
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
-    //cout<<"compop: "<<compOp<<endl;
+    //cout<<"getNextRecord"<<endl;
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     SlotDir slotDir;
     do
@@ -608,6 +612,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         fileHandle->readPage(rid.pageNum, loadedPage);
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
     } while (slotDir.tombstone);
+    //cout<<"get rid"<<endl;
     char *record = new char[slotDir.length];
     rbfm->getRecord(record, slotDir, loadedPage);
 //cout<<"fuck1"<<endl;
@@ -619,7 +624,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         }
     }
 //cout<<"fuck2"<<endl;
-    int conditionDataLength = 1;
+    int conditionDataLength = recordDescriptor[i].type;
     char nullInd;
     void* conditionData = malloc(conditionDataLength);
 
@@ -638,7 +643,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         memcpy(&nullInd, (char*)conditionData, 1);
     }
 
-    memcpy(&nullInd, (char*)conditionData, 1);
+    //memcpy(&nullInd, (char*)conditionData, 1);
     //cout<<"fuck3"<<endl;
     if(compOp==CompOp::EQ_OP){
         if(recordDescriptor[i].type==0){
@@ -964,11 +969,13 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             return -1;
         }
     } else if(compOp==CompOp::NE_OP){
+        //cout<<"right compop branch"<<endl;
         if(recordDescriptor[i].type==0){
             int val;
             if(nullInd == 0){
                 delete[] record;
                 free(conditionData);
+                //cout<<"right branch for nextTuple"<<endl;
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
@@ -1029,10 +1036,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             return -1;
         }
     } else if(compOp == CompOp::NO_OP){
-        //cout<<"no_op"<<endl;
+        //cout<<"right compop branch"<<endl;
         record2data((void*)record, recordDescriptor, data);
+        //rbfm->printRecord(*fileHandle, data);
         delete[] record;
         free(conditionData);
+        //cout<<"return"<<endl;
         return SUCCESS;
     } else{
         delete[] record;
