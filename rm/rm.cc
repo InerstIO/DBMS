@@ -132,7 +132,6 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     rbfm.openFile(tableFileName, fileHandle);
     RBFM_ScanIterator rbfmIter;// = RBFM_ScanIterator();
     //cout<<"2333"<<endl;
-    //rbfm.openFile(tableFileName, fileHandle);
     vector<string> targetAttr;
     targetAttr.push_back("table_id");
     //cout<<"fuck0"<<endl;
@@ -192,41 +191,46 @@ RC RelationManager::deleteTable(const string &tableName)
     RC rc = rbfm.scan(fileHandle, tableAttr, "", NO_OP, NULL, tableAttrStr, rbfmIter);
     if(rc != SUCCESS) return -1;
     RID rid;
-    void* data;
+    void* data = malloc(1000);
+    void* record = malloc(1000);
     int table_id = -1;
-    while(!rbfmIter.getNextRecord(rid, data)){
-        rbfm.readAttribute(fileHandle, tableAttr, rid, tableName, data);
-        char* d = (char*)data;
+    //cout<<"del1"<<endl;
+    while(!rbfmIter.getNextRecord(rid, record)){
+        rbfm.readAttribute(fileHandle, tableAttr, rid, "table_name", data);
         int length;
-        memcpy(&length, d+1, sizeof(int));
+        memcpy(&length, (char*)data+1, sizeof(int));
+        //cout<<"length: "<<length<<endl;
         bool isTableSame = true;
         if(tableName.size() == length){
             for(int i=0;i<length;i++){
-                if(*(d+i) != tableName[i]){
+                if(*((char*)data+i) != tableName[i]){
+                    cout<<*((char*)data+i)<<", ";
                     isTableSame = false;
                     break;
                 }
             }
+            cout<<endl;
         } else{
             isTableSame = false;
         }
         if(isTableSame){
-            free(data);
+            memset(data,0,1000);
             rbfm.readAttribute(fileHandle, tableAttr, rid, "table_id", data);
-            d = (char*)data;
-            memcpy(&table_id, d+1, sizeof(int));
-            free(data);
+            memcpy(&table_id, (char*)data+1, sizeof(int));
             rbfm.deleteRecord(fileHandle, tableAttr, rid);
             break;
         }
-        free(data);
+        memset(data, 0, 1000);
+        memset(record,0,1000);
     }
+    //cout<<"del2"<<endl;
     rbfm.closeFile(fileHandle);
     rbfm.openFile(columnFileName, fileHandle);
     vector<string> attrs;
     attrs.push_back("table_id");
     rc = rbfm.scan(fileHandle, columnAttr, "", NO_OP, NULL, attrs, rbfmIter);
     if(rc != SUCCESS) return -1;
+    //cout<<"del3"<<endl;
     while(!rbfmIter.getNextRecord(rid, data)){
         int id;
         char* d = (char*)data;
@@ -244,23 +248,20 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 {
     RBFM_ScanIterator rbfmIter;
     vector<string> tableAttrStr;
-    //cout<<"attr1"<<endl;
     for(int i=0;i<tableAttr.size();i++){
         tableAttrStr.push_back(tableAttr[i].name);
     }
-    //cout<<"attr2"<<endl;
-    rbfm.closeFile(fileHandle);
     rbfm.openFile(tableFileName, fileHandle);
     RC rc = rbfm.scan(fileHandle, tableAttr, "", NO_OP, NULL, tableAttrStr, rbfmIter);
-    if(rc != SUCCESS) return -1;
+    cout<<"getA1"<<endl;
+    if(rc != SUCCESS) {cout<<"fail"<<endl;return -1;}
+    cout<<"getA2"<<endl;
     void* data = malloc(1000);
     memset(data,0,1000);
     RID rid;
     int tableId = -1;
     while(!rbfmIter.getNextRecord(rid, data)){
         int pos = 1;
-        //cout<<"fuck"<<endl;
-        //rbfm.printRecord(tableAttr, data);
         int id;
         memcpy(&id, (char*)data+pos, sizeof(int));
         pos += 4;
@@ -279,19 +280,18 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         memset(data,0,1000);
     }
     if(tableId <= 0){
-        //cout<<"tableId: "<<tableId<<endl;
         return -1;
     }
-    //cout<<"attr3"<<endl;
     rbfm.closeFile(fileHandle);
     rbfm.openFile(columnFileName, fileHandle);
     vector<string> columnAttrStr;
     for(int i=0;i<columnAttr.size();i++){
         columnAttrStr.push_back(columnAttr[i].name);
     }
-    //cout<<"attr4"<<endl;
+    cout<<"getA3"<<endl;
     rc = rbfm.scan(fileHandle, columnAttr, "", NO_OP, NULL, columnAttrStr, rbfmIter);
-    if(rc!=SUCCESS) return -1;
+    if(rc!=SUCCESS) {cout<<"fail"<<endl;return -1;}
+    cout<<"getA4"<<endl;
     map<int, Attribute> attrMap;
     while(!rbfmIter.getNextRecord(rid, data)){
         int pos = 1;
@@ -299,8 +299,6 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         int id;
         memcpy(&id, (char*)data+pos, sizeof(int));
         pos+=4;
-                    //cout<<"col records:"<<endl;
-            //rbfm.printRecord(columnAttr, data);
         if(id == tableId){
             int length;
             memcpy(&length, (char*)data+pos, sizeof(int));
@@ -332,7 +330,6 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
             attrMap[position] = attr;
         }
     }
-    //cout<<"attr5"<<endl;
     rbfm.closeFile(fileHandle);
     for(auto it=attrMap.begin();it!=attrMap.end();it++){
         attrs.push_back(it->second);
@@ -348,7 +345,6 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     RC rc = getAttributes(tableName, attrs);
     if(rc != SUCCESS) return rc;
     //cout<<"t2"<<endl;
-    //rbfm.closeFile(fileHandle);
     //cout<<"tableName: "<<tableName<<endl;
     rc = rbfm.openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
@@ -428,18 +424,13 @@ RC RelationManager::printTuple(const vector<Attribute> &attrs, const void *data)
 
 RC RelationManager::readAttribute(const string &tableName, const RID &rid, const string &attributeName, void *data)
 {
-    RC rc = rbfm.openFile(tableName, fileHandle);
-    cout<<"read1"<<endl;
-    if(rc != SUCCESS) return rc;
-    cout<<"read2"<<endl;
     vector<Attribute> attrs;
-    rc = getAttributes(tableName, attrs);
-    cout<<"read3"<<endl;
+    RC rc = getAttributes(tableName, attrs);
+    rc = rbfm.openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
-    cout<<"read4"<<endl;
+    if(rc != SUCCESS) return rc;
     rc = rbfm.readAttribute(fileHandle, attrs, rid, attributeName, data);
     if(rc != SUCCESS) return rc;
-    cout<<"read5"<<endl;
     rc = rbfm.closeFile(fileHandle);
     return rc;
 }
