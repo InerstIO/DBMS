@@ -331,13 +331,13 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
             attr.length = l;
             attrMap[position] = attr;
         }
-        //free(data);
     }
     //cout<<"attr5"<<endl;
     rbfm.closeFile(fileHandle);
     for(auto it=attrMap.begin();it!=attrMap.end();it++){
         attrs.push_back(it->second);
     }
+    free(data);
     return SUCCESS;
 }
 
