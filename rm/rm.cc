@@ -290,6 +290,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         columnAttrStr.push_back(columnAttr[i].name);
     }
     //cout<<"getA3"<<endl;
+    rbfmIter.close();
     rc = rbfm.scan(fileHandle, columnAttr, "", NO_OP, NULL, columnAttrStr, rbfmIter);
     if(rc!=SUCCESS) {cout<<"fail"<<endl;return -1;}
     //cout<<"getA4"<<endl;
@@ -333,6 +334,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     }
     free(data);
     rbfm.closeFile(fileHandle);
+    rbfmIter.close();
     for(auto it=attrMap.begin();it!=attrMap.end();it++){
         attrs.push_back(it->second);
     }
@@ -443,7 +445,42 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
-    return -1;
+    rm_ScanIterator.rm = RelationManager::instance();
+    rm_ScanIterator.rbfmIter.rbfm = RecordBasedFileManager::instance();
+    vector<Attribute> recordDescriptor;
+    rm_ScanIterator.rm->getAttributes(tableName, recordDescriptor);
+    rbfm.openFile(tableName, fileHandle);
+    rm_ScanIterator.rbfmIter.fileHandle = &fileHandle;
+    rm_ScanIterator.rbfmIter.recordDescriptor = recordDescriptor;
+    rm_ScanIterator.rbfmIter.conditionAttribute = conditionAttribute;
+    rm_ScanIterator.rbfmIter.compOp = compOp;
+    rm_ScanIterator.rbfmIter.value = (void *)value;
+    rm_ScanIterator.rbfmIter.attributeNames = attributeNames;
+    //cout<<"c1"<<endl;
+    rm_ScanIterator.rbfmIter.numPages = rm_ScanIterator.rbfmIter.fileHandle->getNumberOfPages();
+    //cout<<"c3: "<<rbfm_ScanIterator.fileHandle->getNumberOfPages()<<endl;
+    rm_ScanIterator.rbfmIter.nextRid.pageNum = 0;
+    rm_ScanIterator.rbfmIter.loadedPage = malloc(PAGE_SIZE); //TODO: free when close()
+    //cout<<"c4"<<endl;
+    //cout<<rbfm_ScanIterator.nextRid.pageNum<<endl;
+    RC rc = rm_ScanIterator.rbfmIter.fileHandle->readPage(rm_ScanIterator.rbfmIter.nextRid.pageNum, rm_ScanIterator.rbfmIter.loadedPage);
+    if (rc != SUCCESS) {
+        //cout<<"fail: "<<rc<<endl;
+        return rc;
+    }
+    //cout<<"c5"<<endl;
+    rm_ScanIterator.rbfmIter.numSlots = rm_ScanIterator.rbfmIter.rbfm->getNumSlots(rm_ScanIterator.rbfmIter.loadedPage);
+    rm_ScanIterator.rbfmIter.nextRid.slotNum = 1;
+    return 0;
+}
+
+RC RM_ScanIterator::getNextTuple(RID &rid, void *data){
+    rbfmIter.getNextRecord(rid, data);
+}
+
+RC RM_ScanIterator::close(){
+    rbfmIter.close();
+    rbfmIter.rbfm->closeFile(fileHandle);
 }
 
 // Extra credit work

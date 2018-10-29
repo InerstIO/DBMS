@@ -12,16 +12,18 @@
 using namespace std;
 
 # define RM_EOF (-1)  // end of a scan operator
-
+class RelationManager;
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
 public:
   RM_ScanIterator() {};
   ~RM_ScanIterator() {};
-
+  RBFM_ScanIterator rbfmIter;
+  FileHandle fileHandle;
+  RelationManager* rm;
   // "data" follows the same format as RelationManager::insertTuple()
-  RC getNextTuple(RID &rid, void *data) { return RM_EOF; };
-  RC close() { return -1; };
+  RC getNextTuple(RID &rid, void *data);
+  RC close();
 };
 
 
