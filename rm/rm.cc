@@ -352,11 +352,11 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     if(rc != SUCCESS) return rc;
     //cout<<"t2"<<endl;
     //cout<<"tableName: "<<tableName<<endl;
-    cout<<"t3"<<endl;
-    for(int i=0;i<attrs.size();i++){
-        cout<<attrs[i].name<<": "<<attrs[i].type<<", "<<attrs[i].length<<endl;
-    }
-    rbfm.printRecord(attrs, data);
+    //cout<<"t3"<<endl;
+    //for(int i=0;i<attrs.size();i++){
+    //    cout<<attrs[i].name<<": "<<attrs[i].type<<", "<<attrs[i].length<<endl;
+    //}
+    //rbfm.printRecord(attrs, data);
     rc = rbfm.openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
     rc = rbfm.insertRecord(fileHandle, attrs, data, rid);
