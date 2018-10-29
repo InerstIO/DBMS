@@ -179,6 +179,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         //rbfm->printRecord(columnAttr, data);
         insertTupleHelper(columnFileName, columnAttr, data, rid);
     }
+    rbfmIter.close();
     free(data);
     return SUCCESS;
 }
