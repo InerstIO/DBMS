@@ -336,7 +336,6 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     for(auto it=attrMap.begin();it!=attrMap.end();it++){
         attrs.push_back(it->second);
     }
-    free(data);
     return SUCCESS;
 }
 
