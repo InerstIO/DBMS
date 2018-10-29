@@ -594,15 +594,24 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     }
 
     int conditionDataLength = 1;
-    if(recordDescriptor[i].type == 2){
-        conditionDataLength += 4;
-    }
-    conditionDataLength += recordDescriptor[i].length;
-    void* conditionData = malloc(conditionDataLength);
-    memset(conditionData, 0, conditionDataLength);
-    rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
     char nullInd;
-    memcpy(&nullInd, (char*)conditionData, 1);
+    void* conditionData = malloc(conditionDataLength);
+
+    if (compOp != 6) {
+        if (i == recordDescriptor.size()) {
+            delete[] record;
+            return -1;
+        }
+        
+        if(recordDescriptor[i].type == 2){
+            conditionDataLength += 4;
+        }
+        conditionDataLength += recordDescriptor[i].length;
+        memset(conditionData, 0, conditionDataLength);
+        rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
+        memcpy(&nullInd, (char*)conditionData, 1);
+    }
+    
     if(compOp==0){
         if(recordDescriptor[i].type==0){
             int val;
