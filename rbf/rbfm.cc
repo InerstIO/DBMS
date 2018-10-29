@@ -173,6 +173,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
         //append new page
         RC rc = fileHandle.appendPage(page);
         if (rc != SUCCESS) {
+            free(page);
             return rc;
         }
     }
@@ -188,6 +189,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
         //write page
         rc = fileHandle.writePage(rid.pageNum, page);
         if (rc != SUCCESS) {
+            free(page);
             return rc;
         }
     }
@@ -500,7 +502,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 //record2data(record, recordDescriptor, d);
 //printRecord(recordDescriptor, d);
     readAttributeFromRecord(record, slotDir->length, recordDescriptor, attributeName, data);
-
+free(page);
     return 0;
 }
 
@@ -555,6 +557,12 @@ RBFM_ScanIterator::RBFM_ScanIterator() {
 RBFM_ScanIterator::~RBFM_ScanIterator(){
     free(value);
     free(loadedPage);
+}
+
+RC RBFM_ScanIterator::close(){
+    free(value);
+    free(loadedPage);
+    return SUCCESS;
 }
 
 RC RBFM_ScanIterator::getNextRid(RID &rid) {
