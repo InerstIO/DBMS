@@ -79,7 +79,7 @@ public:
 private:
     string tableFileName = "Tables";
     string columnFileName = "Columns";
-    RecordBasedFileManager rbfm;
+    RecordBasedFileManager* rbfm;
     vector<Attribute> tableAttr;
     vector<Attribute> columnAttr;
 
