@@ -25,10 +25,12 @@ RC PagedFileManager::createFile(const string &fileName)
 {
     ifstream ifile(fileName);
     if (ifile) {
+        ifile.close();
 	   return FILE_EXISTED;
     } else{
 	   ofstream outfile (fileName);
        char* firstPage = new char[PAGE_SIZE];
+       memset((void*)firstPage,0,PAGE_SIZE);
        outfile.write(firstPage, PAGE_SIZE);
        outfile.flush();
 	   outfile.close();
@@ -54,6 +56,9 @@ RC PagedFileManager::destroyFile(const string &fileName)
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 {
     RC rc = -1;
+    if(fileHandle.filefs.is_open()){
+        fileHandle.filefs.close();
+    }
 	   fileHandle.filefs.open(fileName);
 	   if(fileHandle.filefs.is_open()){
             char* firstPage = new char[PAGE_SIZE];
@@ -66,6 +71,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 	   } else{
 	        rc = OPEN_HANDLE_FAIL;
 	   }
+       //cout<<fileHandle.appendPageCounter<<endl;
     return rc;
 }
 
@@ -102,11 +108,17 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
+    //cout<<"readpage: "<<filefs.is_open()<<endl;
     pageNum = pageNum+1;
     RC rc = -1;
+    //cout<<"r1"<<endl;
+    //cout<<getNumberOfPages()<<", "<<pageNum<<endl;
     if(pageNum <= getNumberOfPages()){
+        //cout<<"r2"<<endl;
         filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
+        //cout<<"r"<<endl;
         filefs.read((char*)data, PAGE_SIZE);
+        //cout<<"r3"<<endl;
         if(filefs){
             rc = SUCCESS;
             readPageCounter++;
@@ -119,6 +131,7 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
             filefs.flush();
             delete[] firstPage;
         } else{
+            //cout<<"readpage: "<<getNumberOfPages()<<", "<<pageNum<<endl;
             rc = READ_PAGE_FAIL;
         }
     } else{
