@@ -81,7 +81,7 @@ public:
   // "data" follows the same format as RecordBasedFileManager::insertRecord().
   RecordBasedFileManager* rbfm;// = RecordBasedFileManager::instance();;
   RC getNextRecord(RID &rid, void *data);
-  RC close() { return -1; };
+  RC close();
   FileHandle* fileHandle;
   vector<Attribute> recordDescriptor;
   string conditionAttribute;
