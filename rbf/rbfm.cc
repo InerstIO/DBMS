@@ -181,6 +181,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     {
         RC rc = fileHandle.readPage(rid.pageNum, page);
         if (rc != SUCCESS) {
+            free(page);
             return rc;
         }
         //update the page
@@ -502,7 +503,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 //record2data(record, recordDescriptor, d);
 //printRecord(recordDescriptor, d);
     readAttributeFromRecord(record, slotDir->length, recordDescriptor, attributeName, data);
-free(page);
+    free(page);
     return 0;
 }
 
