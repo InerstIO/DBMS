@@ -582,7 +582,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         fileHandle->readPage(rid.pageNum, loadedPage);
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
     } while (slotDir.tombstone);
-    char *record = new char[slotDir.length]; //TODO: delete[]
+    char *record = new char[slotDir.length];
     rbfm->getRecord(record, slotDir, loadedPage);
 
     unsigned i;
@@ -598,7 +598,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         conditionDataLength += 4;
     }
     conditionDataLength += recordDescriptor[i].length;
-    void* conditionData = malloc(conditionDataLength);//TODO: free
+    void* conditionData = malloc(conditionDataLength);
     memset(conditionData, 0, conditionDataLength);
     rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
     char nullInd;
@@ -607,32 +607,46 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         if(recordDescriptor[i].type==0){
             int val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val == *(int*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==1){
             float val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val == *(float*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==2){
             string val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
@@ -640,8 +654,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
                 memcpy(&val, (char*)conditionData+5, length);
                 if(val == *(string*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
@@ -652,32 +670,46 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         if(recordDescriptor[i].type==0){
             int val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val < *(int*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==1){
             float val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val < *(float*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==2){
             string val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
@@ -685,44 +717,64 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
                 memcpy(&val, (char*)conditionData+5, length);
                 if(val < *(string*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else{
+            delete[] record;
+            free(conditionData);
             return -1;
         }
     } else if(compOp==2){
         if(recordDescriptor[i].type==0){
             int val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val <= *(int*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==1){
             float val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val <= *(float*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==2){
             string val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
@@ -730,44 +782,64 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
                 memcpy(&val, (char*)conditionData+5, length);
                 if(val <= *(string*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else{
+            delete[] record;
+            free(conditionData);
             return -1;
         }
     } else if(compOp==3){
         if(recordDescriptor[i].type==0){
             int val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val > *(int*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==1){
             float val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val > *(float*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==2){
             string val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
@@ -775,44 +847,64 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
                 memcpy(&val, (char*)conditionData+5, length);
                 if(val > *(string*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else{
+            delete[] record;
+            free(conditionData);
             return -1;
         }
     } else if(compOp==4){
         if(recordDescriptor[i].type==0){
             int val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val >= *(int*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==1){
             float val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val >= *(float*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==2){
             string val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
@@ -820,44 +912,64 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
                 memcpy(&val, (char*)conditionData+5, length);
                 if(val >= *(string*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else{
+            delete[] record;
+            free(conditionData);
             return -1;
         }
     } else if(compOp==5){
         if(recordDescriptor[i].type==0){
             int val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val != *(int*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==1){
             float val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 memcpy(&val, (char*)conditionData+1, 4);
                 if(val != *(float*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(recordDescriptor[i].type==2){
             string val;
             if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
@@ -865,20 +977,32 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
                 memcpy(&val, (char*)conditionData+5, length);
                 if(val != *(string*)(value)){
                     record2data((void*)record, recordDescriptor, data);
+                    delete[] record;
+                    free(conditionData);
                     return 0;
                 } else{
+                    delete[] record;
+                    free(conditionData);
                     return getNextRecord(rid, data);
                 }
             }
         } else if(compOp == 6){
             record2data((void*)record, recordDescriptor, data);
+            delete[] record;
+            free(conditionData);
             return 0;
         }else{
+            delete[] record;
+            free(conditionData);
             return -1;
         }
     } else{
+        delete[] record;
+        free(conditionData);
         return -1;
     }
+    delete[] record;
+    free(conditionData);
     return 0;
 }
 
