@@ -82,7 +82,6 @@ private:
     RecordBasedFileManager rbfm;
     vector<Attribute> tableAttr;
     vector<Attribute> columnAttr;
-    FileHandle fileHandle;
 
     RC generateTableRecord(int tableId, string tableName, string fileName, void* data, int& length);
     RC generateColumnRecord(int tableId, string columnName, int columnType, int columnLength, int columnPos, void* data, int& length);
