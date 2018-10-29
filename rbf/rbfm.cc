@@ -486,19 +486,19 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
     void *page = malloc(PAGE_SIZE);
     SlotDir* slotDir = new SlotDir;
     RC rc = getPageSlotDir(fileHandle, rid, page, slotDir);
-    cout<<"ra1"<<endl;
+    //cout<<"ra1"<<endl;
     if (rc!=SUCCESS) {
         free(page);
         delete slotDir;
         return rc;
     }
-    cout<<"ra2"<<endl;
+    //cout<<"ra2"<<endl;
     char *record = new char[slotDir->length];
     getRecord(record, *slotDir, page);
-cout<<"record in readAttribute: "<<endl;
-void* d = malloc(1000);
-record2data(record, recordDescriptor, d);
-printRecord(recordDescriptor, d);
+//cout<<"record in readAttribute: "<<endl;
+//void* d = malloc(1000);
+//record2data(record, recordDescriptor, d);
+//printRecord(recordDescriptor, d);
     readAttributeFromRecord(record, slotDir->length, recordDescriptor, attributeName, data);
 
     return 0;
