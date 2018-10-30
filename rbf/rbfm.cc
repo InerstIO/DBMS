@@ -697,7 +697,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         //cout<<"readPage"<<endl;
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
         //cout<<"getSlotDir"<<endl;
-    } while (slotDir.tombstone);
+    } while (slotDir.tombstone || slotDir.offset == USHRT_MAX);
     //cout<<"get rid"<<endl;
     char *record = new char[slotDir.length];
     rbfm->getRecord(record, slotDir, loadedPage);
