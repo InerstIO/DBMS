@@ -11,7 +11,7 @@
 
 using namespace std;
 
-# define RM_EOF (-1)  // end of a scan operator
+# define RM_EOF RBFM_EOF  // end of a scan operator
 class RelationManager;
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
