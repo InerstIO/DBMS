@@ -308,6 +308,9 @@ void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, sh
     for(int i = start; i <= numSlots; i++)
     {
         SlotDir slotDir = getSlotDir(i, page);
+        if (slotDir.offset == USHRT_MAX) {
+            continue;
+        }
         slotDir.offset += delta;
         setSlotDir(page, i, slotDir);
     }
@@ -687,7 +690,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         }
         fileHandle->readPage(rid.pageNum, loadedPage);
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
-    } while (slotDir.tombstone);
+        //cout<<"getSlotDir"<<endl;
+    } while (slotDir.tombstone || slotDir.offset == USHRT_MAX);
     //cout<<"get rid"<<endl;
     char *record = new char[slotDir.length];
     rbfm->getRecord(record, slotDir, loadedPage);
