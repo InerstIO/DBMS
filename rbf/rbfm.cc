@@ -308,6 +308,9 @@ void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, sh
     for(int i = start; i <= numSlots; i++)
     {
         SlotDir slotDir = getSlotDir(i, page);
+        if (slotDir.offset == USHRT_MAX) {
+            continue;
+        }
         slotDir.offset += delta;
         setSlotDir(page, i, slotDir);
     }
