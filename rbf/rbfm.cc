@@ -619,10 +619,10 @@ RC RecordBasedFileManager::concatData(const void* record, const vector<Attribute
         return SUCCESS;
     }
     //cout<<"record: "<<endl;
-    void* rc = malloc(4000);
-    record2data(record,recordDescriptor,rc);
+    //void* rc = malloc(4000);
+    //record2data(record,recordDescriptor,rc);
     //printRecord(recordDescriptor,rc);
-    free(rc);
+    //free(rc);
     int nullIndSize = ceil(((double)attributeName.size())/8);
     char* nullIndicator = new char[nullIndSize];
     memset(nullIndicator,0,nullIndSize);
@@ -688,13 +688,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             //cout<<"end iter"<<endl;
             return RBFM_EOF;
         }
-        //cout<<rid.pageNum<<endl;
-        //cout<<"filehandle in getNextRecord scan"<<endl;
-        //unsigned writeNum, readNum, appendNum;
-        //fileHandle->collectCounterValues(readNum, writeNum, appendNum);
-        //cout<<writeNum<<", "<<readNum<<", "<<appendNum<<endl;
         fileHandle->readPage(rid.pageNum, loadedPage);
-        //cout<<"readPage"<<endl;
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
         //cout<<"getSlotDir"<<endl;
     } while (slotDir.tombstone || slotDir.offset == USHRT_MAX);
