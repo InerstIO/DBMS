@@ -402,10 +402,13 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
     vector<Attribute> attrs;
     RC rc = getAttributes(tableName, attrs);
     if(rc != SUCCESS) return rc;
+    cout<<"getAttribute successful"<<endl;
     rc = rbfm->openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
+    cout<<"openfile successful"<<endl;
     rc = rbfm->deleteRecord(fileHandle, attrs, rid);
     if(rc != SUCCESS) return rc;
+    cout<<"delete successful"<<endl;
     rc = rbfm->closeFile(fileHandle);
     return rc;
 }
