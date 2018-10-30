@@ -135,7 +135,9 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     RBFM_ScanIterator rbfmIter;// = RBFM_ScanIterator();
     //cout<<"2333"<<endl;
     vector<string> targetAttr;
-    targetAttr.push_back("table-id");
+    for(int i=0;i<tableAttr.size();i++){
+        targetAttr.push_back(tableAttr[i].name);
+    }
     //cout<<"fuck0"<<endl;
     RC rc = rbfm->scan(fileHandle, tableAttr, "", NO_OP, NULL, targetAttr, rbfmIter);
     RID rid;
@@ -143,6 +145,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     void* data = malloc(4000);
     memset(data, 0, 4000);
     while(!rbfmIter.getNextRecord(rid, data)){
+        //rbfm->printRecord(tableAttr, data);
         int id;
         memcpy(&id, (char*)data+1, sizeof(int));
         //cout<<"userId: "<<id<<endl;
@@ -285,6 +288,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         }
         memset(data,0,4000);
     }
+    //cout<<"tableId: "<<tableId<<endl;
     if(tableId <= 0){
         free(data);
         return -1;
@@ -307,6 +311,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         int id;
         memcpy(&id, (char*)data+pos, sizeof(int));
         pos+=4;
+       // rbfm->printRecord(columnAttr, data);
         if(id == tableId){
             int length;
             memcpy(&length, (char*)data+pos, sizeof(int));
@@ -397,10 +402,13 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
     vector<Attribute> attrs;
     RC rc = getAttributes(tableName, attrs);
     if(rc != SUCCESS) return rc;
+    cout<<"getAttribute successful"<<endl;
     rc = rbfm->openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
+    cout<<"openfile successful"<<endl;
     rc = rbfm->deleteRecord(fileHandle, attrs, rid);
     if(rc != SUCCESS) return rc;
+    cout<<"delete successful"<<endl;
     rc = rbfm->closeFile(fileHandle);
     return rc;
 }
@@ -489,21 +497,27 @@ RC RelationManager::scan(const string &tableName,
     rm_ScanIterator.rbfmIter.numSlots = rm_ScanIterator.rbfmIter.rbfm->getNumSlots(rm_ScanIterator.rbfmIter.loadedPage);
     rm_ScanIterator.rbfmIter.nextRid.slotNum = 1;*/
 
-    FileHandle fileHandle;
     rm_ScanIterator.rm = RelationManager::instance();
     //rm_ScanIterator.rbfmIter.rbfm = rbfm;
     vector<Attribute> recordDescriptor;
     rm_ScanIterator.rm->getAttributes(tableName, recordDescriptor);
-    cout<<"getAttributes: "<<recordDescriptor.size()<<endl;
-    rbfm->openFile(tableName, fileHandle);
+    //cout<<"getAttributes: "<<recordDescriptor.size()<<endl;
+    //FileHandle fileHandle;
+    rbfm->openFile(tableName, rm_ScanIterator.rmFileHandle);
+    //cout<<"filehandle in rm scan"<<endl;
+    unsigned writeNum = 0;
+    unsigned readNum = 0;
+    unsigned appendNum = 0;
+    rm_ScanIterator.rmFileHandle.collectCounterValues(readNum, writeNum, appendNum);
+    cout<<writeNum<<", "<<readNum<<", "<<appendNum<<endl;
     //RC rc = rm_ScanIterator.rbfmIter.fileHandle->readPage(rm_ScanIterator.rbfmIter.nextRid.pageNum, rm_ScanIterator.rbfmIter.loadedPage);
-    rbfm->scan(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames, rm_ScanIterator.rbfmIter);
-    rbfm->closeFile(fileHandle);
+    rbfm->scan(rm_ScanIterator.rmFileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames, rm_ScanIterator.rbfmIter);
+    //rbfm->closeFile(fileHandle);
     return 0;
 }
 
 RC RM_ScanIterator::getNextTuple(RID &rid, void *data){
-    cout<<"getNextTuple"<<endl;
+    //cout<<"getNextTuple"<<endl;
     return rbfmIter.getNextRecord(rid, data);
 }
 
@@ -511,6 +525,10 @@ RC RM_ScanIterator::close(){
     //rbfmIter.rbfm->closeFile(fileHandle);
     return rbfmIter.close();
 }
+
+RM_ScanIterator:: ~RM_ScanIterator() {
+    rbfmIter.rbfm->closeFile(rmFileHandle);
+};
 
 // Extra credit work
 RC RelationManager::dropAttribute(const string &tableName, const string &attributeName)

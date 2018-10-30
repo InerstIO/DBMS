@@ -8,6 +8,7 @@
 #include <bitset>
 #include <stdio.h>
 #include <cstring>
+#include <unordered_set>
 
 #include "../rbf/pfm.h"
 
@@ -148,7 +149,7 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
 
   RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data);
 
-  RC readAttributeFromRecord(void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data);
+  RC readAttributeFromRecord(const void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data);
   // Scan returns an iterator to allow the caller to go through the results one by one. 
   RC scan(FileHandle &fileHandle,
       const vector<Attribute> &recordDescriptor,
@@ -164,6 +165,8 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
   SlotDir getSlotDir(const unsigned slotNum, const void* page);
   // Get record related to slotDir in page.
   void getRecord(void* record, SlotDir slotDir, void* page);
+//concat data in attrbuteName
+  RC concatData(const void* record, const vector<Attribute> &recordDescriptor, const vector<string> &attributeName, void* data);
 public:
 
 //protected:
