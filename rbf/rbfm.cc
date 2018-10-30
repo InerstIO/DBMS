@@ -513,7 +513,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
     return 0;
 }
 
-RC RecordBasedFileManager::readAttributeFromRecord(void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
+RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
     unsigned i;
     short base = sizeof(short)*recordDescriptor.size()+4-1;
     short startAddr = sizeof(short)*recordDescriptor.size()+4;
@@ -522,7 +522,7 @@ RC RecordBasedFileManager::readAttributeFromRecord(void* record, unsigned short 
     for(i = 0; i < recordDescriptor.size(); i++)
     {
         short pointer;
-        cout<<recordDescriptor[i].name<<": "<<endl;
+        //cout<<recordDescriptor[i].name<<": "<<endl;
         memcpy(&pointer, (char*)record+i*sizeof(short)+4, sizeof(short));
         //cout<<"pointer: "<<pointer<<endl;
         if (recordDescriptor[i].name == attributeName) {
@@ -548,16 +548,17 @@ RC RecordBasedFileManager::readAttributeFromRecord(void* record, unsigned short 
     
     char nullIndicator;
     if(isNull){
-        nullIndicator = 0;
+        nullIndicator = 255;
     } else{
-        nullIndicator = 128;
+        nullIndicator = 0;
     }
     ((char*)data)[0] = nullIndicator;
     if(recordDescriptor[i].type == 2){
-        int length = endAddr-startAddr;
+        length = endAddr-startAddr;
         memcpy((char*)data+1, &length, sizeof(int));
         memcpy((char*)data+5, (char*)record+startAddr, length);
     } else{
+        length = 4;
         memcpy((char*)data+1, (char*)record+startAddr, 4);
     }
     return 0;
@@ -600,17 +601,90 @@ RC RBFM_ScanIterator::getNextRid(RID &rid) {
     return SUCCESS;
 }
 
+RC RecordBasedFileManager::concatData(const void* record, const vector<Attribute> &recordDescriptor, const vector<string> &attributeName, void* data){
+    if(recordDescriptor.size() == attributeName.size()){
+        record2data(record,recordDescriptor,data);
+        return SUCCESS;
+    }
+    //cout<<"record: "<<endl;
+    void* rc = malloc(4000);
+    record2data(record,recordDescriptor,rc);
+    //printRecord(recordDescriptor,rc);
+    free(rc);
+    int nullIndSize = ceil(((double)attributeName.size())/8);
+    char* nullIndicator = new char[nullIndSize];
+    memset(nullIndicator,0,nullIndSize);
+    void* dataBody = malloc(4000);
+    int offset = 0;
+    for(int i=0;i<attributeName.size();i++){
+        Attribute targetAttr;
+        for(int j=0;j<recordDescriptor.size();j++){
+            if(recordDescriptor[j].name == attributeName[i]){
+                targetAttr = recordDescriptor[j];
+                break;
+            }
+        }
+        string attrName = attributeName[i];
+        int length = targetAttr.length;
+        void* fieldData = malloc(4000);
+        memset(fieldData,0,4000);
+        RC rc = readAttributeFromRecord(record, length, recordDescriptor, attrName, fieldData);
+        if(rc != SUCCESS){
+            return rc;
+        }
+        //cout<<"print field data: "<<endl;
+        //vector<Attribute> v;
+        //v.push_back(recordDescriptor[1]);
+        //printRecord(v,fieldData);
+        char filedNullInd;
+        memcpy(&filedNullInd,(char*)fieldData,1);
+        memcpy((char*)dataBody+offset, fieldData+1, length);
+        offset += length;
+        //cout<<"info: "<<(int)filedNullInd<<", "<<offset<<endl;
+        if(filedNullInd > 0){
+            nullIndicator[i/8] += 1<<(7-i%8);
+        }
+        //cout<<nullIndicator[0]<<endl;
+        free(fieldData);
+    }
+    memcpy((char*)data,nullIndicator,nullIndSize);
+    memcpy((char*)data+nullIndSize,(char*)dataBody,offset);
+    /*vector<Attribute> rd;
+    unordered_set<string> attrset;
+    for(int i=0;i<attributeName.size();i++){
+        attrset.insert(attributeName[i]);
+    }
+    for(int i=0;i<recordDescriptor.size();i++){
+        if(attrset.find(recordDescriptor[i].name) != attrset.end()){
+            rd.push_back(recordDescriptor[i]);
+        }
+    }
+    cout<<"result record: "<<endl;
+    printRecord(rd, data);*/
+    free(dataBody);
+    delete[] nullIndicator;
+    return SUCCESS;
+}
+
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
-    //cout<<"getNextRecord"<<endl;
+    //cout<<"getNextRecord: "<<attributeNames[0]<<endl;
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     SlotDir slotDir;
     do
     {
         if(getNextRid(rid) == RBFM_EOF){
+            //cout<<"end iter"<<endl;
             return RBFM_EOF;
         }
+        //cout<<rid.pageNum<<endl;
+        //cout<<"filehandle in getNextRecord scan"<<endl;
+        //unsigned writeNum, readNum, appendNum;
+        //fileHandle->collectCounterValues(readNum, writeNum, appendNum);
+        //cout<<writeNum<<", "<<readNum<<", "<<appendNum<<endl;
         fileHandle->readPage(rid.pageNum, loadedPage);
+        //cout<<"readPage"<<endl;
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
+        //cout<<"getSlotDir"<<endl;
     } while (slotDir.tombstone);
     //cout<<"get rid"<<endl;
     char *record = new char[slotDir.length];
@@ -624,7 +698,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         }
     }
 //cout<<"fuck2"<<endl;
-    int conditionDataLength = recordDescriptor[i].type;
+    int conditionDataLength = recordDescriptor[i].length;
+    int nullIndSize = ceil(((double)attributeNames.size())/8);
     char nullInd;
     void* conditionData = malloc(conditionDataLength);
 
@@ -1036,9 +1111,13 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             return -1;
         }
     } else if(compOp == CompOp::NO_OP){
-        //cout<<"right compop branch"<<endl;
-        record2data((void*)record, recordDescriptor, data);
-        //rbfm->printRecord(*fileHandle, data);
+       // cout<<"correct branch: "<<recordDescriptor.size()<<", "<<attributeNames.size()<<endl;
+        //if(recordDescriptor.size() != attributeNames.size()){
+        //    cout<<"right compop branch"<<endl;
+        //}
+        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+        //record2data((void*)record, recordDescriptor, data);
+        //rbfm->printRecord(recordDescriptor, data);
         delete[] record;
         free(conditionData);
         //cout<<"return"<<endl;
@@ -1055,6 +1134,10 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
     rbfm_ScanIterator.fileHandle = &fileHandle;
+    //cout<<"filehandle in rbfm scan"<<endl;
+    //unsigned writeNum, readNum, appendNum;
+    //rbfm_ScanIterator.fileHandle->collectCounterValues(readNum, writeNum, appendNum);
+    //cout<<writeNum<<", "<<readNum<<", "<<appendNum<<endl;
     rbfm_ScanIterator.recordDescriptor = recordDescriptor;
     rbfm_ScanIterator.conditionAttribute = conditionAttribute;
     rbfm_ScanIterator.compOp = compOp;

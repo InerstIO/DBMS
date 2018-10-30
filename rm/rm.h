@@ -16,10 +16,11 @@ class RelationManager;
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
 public:
-  RM_ScanIterator() {};
-  ~RM_ScanIterator() {};
+  RM_ScanIterator(){};
+  ~RM_ScanIterator();
   RBFM_ScanIterator rbfmIter;
   RelationManager* rm;
+  FileHandle rmFileHandle;
   // "data" follows the same format as RelationManager::insertTuple()
   RC getNextTuple(RID &rid, void *data);
   RC close();
