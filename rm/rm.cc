@@ -203,7 +203,7 @@ RC RelationManager::deleteTable(const string &tableName)
     RID rid;
     void* data = malloc(4000);
     int table_id = -1;
-    cout<<"dt1"<<endl;
+    //cout<<"dt1"<<endl;
     while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
         int length;
         int pos = 1;
@@ -211,15 +211,15 @@ RC RelationManager::deleteTable(const string &tableName)
         pos += 4;
         memcpy(&length, (char*)data+pos, sizeof(int));
         pos += 4;
-        cout<<"length: "<<length<<endl;
+        //cout<<"length: "<<length<<endl;
         string targetTableName;
         targetTableName.resize(length);
         memcpy((char*)targetTableName.data(),data+pos,length);
         pos += length;
-cout<<"targetTableName: "<<targetTableName<<endl;
+//cout<<"targetTableName: "<<targetTableName<<endl;
         bool isTableSame = (targetTableName==tableName);
         if(isTableSame){
-            cout<<"table is same"<<endl;
+            //cout<<"table is same"<<endl;
             rc = rbfm->deleteRecord(fileHandle, tableAttr, rid);
             if(rc != SUCCESS){
                 return -1;
@@ -243,22 +243,22 @@ cout<<"targetTableName: "<<targetTableName<<endl;
     if(rc != SUCCESS) return -1;
     //cout<<"del3"<<endl;
     memset(data,0,4000);
-    cout<<"dc1"<<endl;
+    //cout<<"dc1"<<endl;
     while(!rbfmIter.getNextRecord(rid, data)){
-        cout<<"dc2"<<endl;
+        //cout<<"dc2"<<endl;
         int id;
         memcpy(&id, (char*)data+1, sizeof(int));
-        cout<<"id: "<<id<<endl;
+        //cout<<"id: "<<id<<endl;
         if(id == table_id){
+            cout<<"delete table id: "<<id<<endl;
             rbfm->deleteRecord(fileHandle, columnAttr, rid);
         }
         memset(data,0,4000);
     }
+    //cout<<"finish delete"<<endl;
     free(data);
     rbfm->closeFile(fileHandle);
     rbfmIter.close();
-    free(data);
-    free(record);
     return SUCCESS;
 }
 
@@ -279,26 +279,29 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     memset(data,0,4000);
     RID rid;
     int tableId = -1;
+    cout<<"getAttr1"<<endl;
     while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
+        cout<<"getAttr nextrecord"<<endl;
         int pos = 1;
         int id;
         memcpy(&id, (char*)data+pos, sizeof(int));
+        cout<<"table_id: "<<id<<endl;
         pos += 4;
         int length;
         memcpy(&length, (char*)data+pos, sizeof(int));
         pos += 4;
         string name;
-        for(int i=0;i<length;i++){
-            name.push_back(*((char*)data+pos));
-            pos++;
-        }
+        name.resize(length);
+        memcpy((char*)name.data(),data+pos,length);
+        pos += length;
+        cout<<"tableName: "<<name<<", "<<tableName<<endl;
         if(name == tableName){
             tableId = id;
             break;
         }
         memset(data,0,4000);
     }
-    //cout<<"tableId: "<<tableId<<endl;
+    cout<<"tableId: "<<tableId<<endl;
     if(tableId <= 0){
         free(data);
         return -1;
@@ -441,10 +444,13 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
 {
     FileHandle fileHandle;
     vector<Attribute> attrs;
+    cout<<"readtuple"<<endl;
     RC rc = getAttributes(tableName, attrs);
     if(rc != SUCCESS) return rc;
+    cout<<"getAttr"<<endl;
     rc = rbfm->openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
+    cout<<"openfile"<<endl;
     rc = rbfm->readRecord(fileHandle, attrs, rid, data);
     if(rc != SUCCESS) return rc;
     rc = rbfm->closeFile(fileHandle);
