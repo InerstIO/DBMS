@@ -8,8 +8,12 @@
 #include <bitset>
 #include <stdio.h>
 #include <cstring>
+#include <unordered_set>
 
 #include "../rbf/pfm.h"
+
+#define SIZE_NUM_FIELDS 4
+#define SIZE_FIELD_POINTER 2
 
 using namespace std;
 
@@ -32,11 +36,14 @@ struct Attribute {
 };
 
 struct SlotDir {
-  unsigned offset;
-  unsigned length;
+  bool tombstone;
+  unsigned short offset;
+  unsigned short length;
 };
 
-void* data2record(const void* data, const vector<Attribute>& recordDescriptor, int& length);
+vector<bitset<8>> nullIndicators(int size, const void *data);
+void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned short& length);
+void record2data(const void* record, const vector<Attribute>& recordDescriptor, void* data);
 
 // Comparison Operator (NOT needed for part 1 of the project)
 typedef enum { EQ_OP = 0, // no condition// = 
@@ -63,26 +70,38 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 //    process the data;
 //  }
 //  rbfmScanIterator.close();
+class RecordBasedFileManager;
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() {};
-  ~RBFM_ScanIterator() {};
+  RBFM_ScanIterator();
+  ~RBFM_ScanIterator();
 
   // Never keep the results in the memory. When getNextRecord() is called, 
   // a satisfying record needs to be fetched from the file.
   // "data" follows the same format as RecordBasedFileManager::insertRecord().
-  RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
-  RC close() { return -1; };
+  RecordBasedFileManager* rbfm;// = RecordBasedFileManager::instance();;
+  RC getNextRecord(RID &rid, void *data);
+  RC close();
+  FileHandle* fileHandle;
+  vector<Attribute> recordDescriptor;
+  string conditionAttribute;
+  CompOp compOp;
+  const void *value;
+  vector<string> attributeNames;
+  RC getNextRid(RID &rid);
+  int numSlots;
+  int numPages;
+  RID nextRid;
+  void* loadedPage;
 };
-
 
 class RecordBasedFileManager
 {
 public:
   static RecordBasedFileManager* instance();
 
-  PagedFileManager* pfm;
+  PagedFileManager* pfm = PagedFileManager::instance();
 
   int curPage;
   int curSlot;
@@ -130,6 +149,7 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
 
   RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data);
 
+  RC readAttributeFromRecord(const void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data);
   // Scan returns an iterator to allow the caller to go through the results one by one. 
   RC scan(FileHandle &fileHandle,
       const vector<Attribute> &recordDescriptor,
@@ -139,9 +159,17 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
       const vector<string> &attributeNames, // a list of projected attributes
       RBFM_ScanIterator &rbfm_ScanIterator);
 
+  // Get numSlots in page.
+  short getNumSlots(const void* page);
+  // Get slotDir from rid and page.
+  SlotDir getSlotDir(const unsigned slotNum, const void* page);
+  // Get record related to slotDir in page.
+  void getRecord(void* record, SlotDir slotDir, void* page);
+//concat data in attrbuteName
+  RC concatData(const void* record, const vector<Attribute> &recordDescriptor, const vector<string> &attributeName, void* data);
 public:
 
-protected:
+//protected:
   RecordBasedFileManager();
   ~RecordBasedFileManager();
 
@@ -150,11 +178,27 @@ private:
 
   // RID.pageNum can be equal numPages if no enough free space.
   // Need to append a new page in this case.
-  RC insertPos(FileHandle &fileHandle, int length, RID &rid);
+  RC insertPos(FileHandle &fileHandle, unsigned short length, RID &rid);
   // Return num of free bytes in the page.
   unsigned freeSpace(const void *data);
   // Insert record to data.
-  void insert2data(void *data, char *record, unsigned length, int slotNum);
+  void insert2data(void *data, char *record, unsigned short length, unsigned slotNum);
+  // Get freeBegin in page.
+  short getFreeBegin(const void* page);
+  // Set freeBegin in page.
+  void setFreeBegin(unsigned short freeBegin, void* page);
+  // Set numSlots in page.
+  void setNumSlots(unsigned short numSlots, void* page);
+  // Set slotDir at slotNum in page.
+  void setSlotDir(void* page, unsigned slotNum, SlotDir slotDir);
+  // Update offsets in slotDirs starting from start to numSlots with delta in page.
+  void updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta);
+  // Move records by delta to destOffset. If delta is positive, move to right, else to left.
+  void moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta);
+  // Set record in page.
+  void setRecord(void* page, void* record, SlotDir slotDir);
+  // Get real page and slotDir from rid.
+  RC getPageSlotDir(FileHandle &fileHandle, const RID &rid, void* page, SlotDir* slotDirPtr);
 };
 
 #endif

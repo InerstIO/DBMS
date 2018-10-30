@@ -25,10 +25,12 @@ RC PagedFileManager::createFile(const string &fileName)
 {
     ifstream ifile(fileName);
     if (ifile) {
+        ifile.close();
 	   return FILE_EXISTED;
     } else{
 	   ofstream outfile (fileName);
        char* firstPage = new char[PAGE_SIZE];
+       memset((void*)firstPage,0,PAGE_SIZE);
        outfile.write(firstPage, PAGE_SIZE);
        outfile.flush();
 	   outfile.close();
@@ -54,9 +56,13 @@ RC PagedFileManager::destroyFile(const string &fileName)
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 {
     RC rc = -1;
+    if(fileHandle.filefs.is_open()){
+        fileHandle.filefs.close();
+    }
 	   fileHandle.filefs.open(fileName);
 	   if(fileHandle.filefs.is_open()){
             char* firstPage = new char[PAGE_SIZE];
+            memset(firstPage,0,PAGE_SIZE);
             fileHandle.filefs.read(firstPage, PAGE_SIZE);
             memcpy(&(fileHandle.readPageCounter), firstPage, sizeof(int));
             memcpy(&(fileHandle.writePageCounter), firstPage+4, sizeof(int));
@@ -66,6 +72,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 	   } else{
 	        rc = OPEN_HANDLE_FAIL;
 	   }
+       //cout<<fileHandle.appendPageCounter<<endl;
     return rc;
 }
 
@@ -73,6 +80,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 RC PagedFileManager::closeFile(FileHandle &fileHandle)
 {
     char* firstPage = new char[PAGE_SIZE];
+    memset(firstPage,0,PAGE_SIZE);
     memcpy(firstPage, &(fileHandle.readPageCounter), sizeof(int));
     memcpy(firstPage+4, &(fileHandle.writePageCounter), sizeof(int));
     memcpy(firstPage+8, &(fileHandle.appendPageCounter), sizeof(int));
@@ -102,31 +110,38 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
+    //cout<<"readpage: "<<filefs.is_open()<<endl;
     pageNum = pageNum+1;
     RC rc = -1;
-    //if(sizeof(*(char*)data) == PAGE_SIZE){
-        if(pageNum <= getNumberOfPages()){
-            filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
-            filefs.read((char*)data, PAGE_SIZE);
-            if(filefs){
-                rc = SUCCESS;
-                readPageCounter++;
-                char* firstPage = new char[PAGE_SIZE];
-                memcpy(firstPage, &(readPageCounter), sizeof(int));
-                memcpy(firstPage+4, &(writePageCounter), sizeof(int));
-                memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
-                filefs.seekg(0, filefs.beg);
-                filefs.write(firstPage, PAGE_SIZE);
-                filefs.flush();
-            } else{
-                rc = READ_PAGE_FAIL;
-            }
+    //cout<<"r1"<<endl;
+    //cout<<"readPage: "<<appendPageCounter<<", "<<writePageCounter<<", "<<readPageCounter<<", "<<pageNum<<endl;
+    if(pageNum <= getNumberOfPages()){
+        //cout<<"r2"<<endl;
+        //cout<<filefs.peek()<<endl;
+        //cout<<"seekg: "<<pageNum*PAGE_SIZE<<endl;
+        filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
+        //cout<<"r"<<endl;
+        filefs.read((char*)data, PAGE_SIZE);
+        //cout<<"r3"<<endl;
+        if(filefs){
+            rc = SUCCESS;
+            readPageCounter++;
+            char* firstPage = new char[PAGE_SIZE];
+            memset(firstPage,0,PAGE_SIZE);
+            memcpy(firstPage, &(readPageCounter), sizeof(int));
+            memcpy(firstPage+4, &(writePageCounter), sizeof(int));
+            memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
+            filefs.seekg(0, filefs.beg);
+            filefs.write(firstPage, PAGE_SIZE);
+            filefs.flush();
+            delete[] firstPage;
         } else{
-            rc = PAGENUM_EXCEED;
+            //cout<<"readpage: "<<getNumberOfPages()<<", "<<pageNum<<endl;
+            rc = READ_PAGE_FAIL;
         }
-    //} else{
-    //    rc = WRONG_DATA_SIZE;
-    //}
+    } else{
+        rc = PAGENUM_EXCEED;
+    }
     return rc;
 }
 
@@ -135,29 +150,28 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
     RC rc = -1;
     pageNum += 1;
-    //if(sizeof(*(char*)data) == PAGE_SIZE){
-        if(pageNum <= getNumberOfPages()){
-            filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
-            filefs.write((char*)data, PAGE_SIZE);
-            if(filefs){
-                rc = SUCCESS;
-                writePageCounter++;
-                char* firstPage = new char[PAGE_SIZE];
-                memcpy(firstPage, &(readPageCounter), sizeof(int));
-                memcpy(firstPage+4, &(writePageCounter), sizeof(int));
-                memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
-                filefs.seekg(0, filefs.beg);
-                filefs.write(firstPage, PAGE_SIZE);
-                filefs.flush();
-            } else{
-                rc = WRITE_PAGE_FAIL;
-            }
+    //cout<<"write page: "<<appendPageCounter<<", "<<writePageCounter<<", "<<readPageCounter<<", "<<pageNum<<endl;
+    if(pageNum <= getNumberOfPages()){
+        filefs.seekg(pageNum*PAGE_SIZE, filefs.beg);
+        filefs.write((char*)data, PAGE_SIZE);
+        if(filefs){
+            rc = SUCCESS;
+            writePageCounter++;
+            char* firstPage = new char[PAGE_SIZE];
+            memset(firstPage,0,PAGE_SIZE);
+            memcpy(firstPage, &(readPageCounter), sizeof(int));
+            memcpy(firstPage+4, &(writePageCounter), sizeof(int));
+            memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
+            filefs.seekg(0, filefs.beg);
+            filefs.write(firstPage, PAGE_SIZE);
+            filefs.flush();
+            delete[] firstPage;
         } else{
-            rc = PAGENUM_EXCEED;
+            rc = WRITE_PAGE_FAIL;
         }
-    //} else{
-      //  rc = WRONG_DATA_SIZE;
-    //}
+    } else{
+        rc = PAGENUM_EXCEED;
+    }
     return rc;
 }
 
@@ -165,24 +179,20 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 RC FileHandle::appendPage(const void *data)
 {
     RC rc = -1;
-    //cout<<sizeof((char*)data)<<endl;
-    //if(sizeof(*(char*)data) == PAGE_SIZE){
-        //cout<<"hyx1"<<endl;
-        filefs.seekg((appendPageCounter+1)*PAGE_SIZE, filefs.beg);
-        filefs.write((char*)data, PAGE_SIZE);
-        //cout<<"hyx2"<<endl;
-        rc = SUCCESS;
-    //} else{
-      //  rc = WRONG_DATA_SIZE;
-    //}
+   // cout<<"append page: "<<appendPageCounter<<", "<<writePageCounter<<", "<<readPageCounter<<endl;
+    filefs.seekg((appendPageCounter+1)*PAGE_SIZE, filefs.beg);
+    filefs.write((char*)data, PAGE_SIZE);
+    rc = SUCCESS;
     appendPageCounter++;
     char* firstPage = new char[PAGE_SIZE];
+    memset(firstPage,0,PAGE_SIZE);
     memcpy(firstPage, &(readPageCounter), sizeof(int));
     memcpy(firstPage+4, &(writePageCounter), sizeof(int));
     memcpy(firstPage+8, &(appendPageCounter), sizeof(int));
     filefs.seekg(0, filefs.beg);
     filefs.write(firstPage, PAGE_SIZE);
     filefs.flush();
+    delete[] firstPage;
     return rc;
 }
 

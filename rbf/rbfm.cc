@@ -2,18 +2,20 @@
 
 #include "rbfm.h"
 
-void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned& length){
-    /*for(int i=0;i<54;i++){
-        cout<<i<<": "<<(int)*((char*)data+i)<<endl;
-    }*/
-    int dataPos = 0;
-    int attrNum = recordDescriptor.size();
-    int nullIndSize = ceil((double)attrNum/(double)8);
+vector<bitset<8>> nullIndicators(int size, const void *data) {
     vector<bitset<8>> nullBits;
-    for(int i=0;i<nullIndSize;i++){
+    for(int i = 0; i < size; i++){
         bitset<8> onebyte(*((char*)data+i));
         nullBits.push_back(onebyte);
     }
+    return nullBits;
+}
+
+void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned short& length){
+    int dataPos = 0;
+    int attrNum = recordDescriptor.size();
+    int nullIndSize = ceil((double)attrNum/(double)8);
+    vector<bitset<8>> nullBits = nullIndicators(nullIndSize, data);
     int recordSize = 4;
     int valSize = 0;
     for(unsigned i=0;i<recordDescriptor.size();i++){
@@ -21,44 +23,31 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, u
         recordSize += recordDescriptor[i].length;
         valSize += recordDescriptor[i].length;
     }
-    //cout<<"recordsize: "<<recordSize<<endl;
     char* record = new char[recordSize];
-    //cout<<"p2"<<endl;
     //put how many attributes
     *(record+3) = attrNum>>24;
     *(record+2) = attrNum>>16 & 0x00ff;
     *(record+1) = attrNum>>8 & 0x0000ff;
     *(record+0) = attrNum & 0x000000ff;
     length += 4;
-    //cout<<"p3"<<endl;
     //put offset in record, put values in value
     char* values = new char[valSize];
     int valLength = 0;
     short offset = 0;
     dataPos += nullIndSize;
     for(int i=0;i<attrNum;i++){
-        //cout<<"p4"<<endl;
-        //cout<<i<<": "<<nullBits[i/8][7-i%8]<<endl;
         if(nullBits[i/8][7-i%8] == 0){
             if(recordDescriptor[i].type == 0 || recordDescriptor[i].type == 1){
-                //cout<<"p9"<<endl;
                 offset += 4;
-                //cout<<i<<": ";
                 for(int j=0;j<4;j++){
-                    //cout<<i<<": "<<valLength<<endl;
-                    //cout<<valLength<<", "<<nullIndSize<<endl;
-                    //cout<<(int)*((char*)data+dataPos)<<", ";
                     *(values+valLength) = *((char*)data+dataPos);
                     dataPos++;
                     valLength++;
                 }
-                //cout<<endl;
             } else{
-                //cout<<"p10"<<endl;
-                //cout<<dataPos<<", "<<(int)*((char*)data+dataPos)<<((int)*((char*)data+dataPos+1)<<8)<<((int)*((char*)data+dataPos+2)<<16)<<((int)*((char*)data+dataPos+3)<<24)<<endl;
-                int stringLength = (int)*((char*)data+dataPos)+((int)*((char*)data+dataPos+1)<<8)+((int)*((char*)data+dataPos+2)<<16)+((int)*((char*)data+dataPos+3)<<24);
+                int stringLength;
+                memcpy(&stringLength, (char*)data+dataPos, sizeof(int));
                 dataPos += 4;
-                //cout<<"stringlength: "<<stringLength<<endl;
                 offset += stringLength;
                 for(int j=0;j<stringLength;j++){
                     *((char*)values+valLength) = *((char*)data+dataPos);
@@ -70,13 +59,11 @@ void* data2record(const void* data, const vector<Attribute>& recordDescriptor, u
             *(record+length) = offset & 0x00ff;
             length += 2;
         } else{
-            //cout<<"p6"<<endl;
             *(record+length+1) = 0xff;
             *(record+length) = 0xff;
             length += 2;
         }
     }
-    //cout<<"p7"<<endl;
     for(int i=0;i<valLength;i++){
         *((char*)record+length) = *(values+i);
         length++;
@@ -91,7 +78,6 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
     int num;
     memcpy(&num, record, 4);
     pos += 4;
-    //cout<<"num: "<<num<<endl;
     vector<char> nullIndicator(ceil((double)num/8), 0);
     vector<short> pointers;
     for(int i=0;i<num;i++){
@@ -99,36 +85,30 @@ void record2data(const void* record, const vector<Attribute>& recordDescriptor, 
         memcpy(&pointer, (char*)record+pos, sizeof(short));
         pos += 2;
         pointers.push_back(pointer);
-        //cout<<pointer<<endl;
         if(pointer == -1){
-            //cout<<"pointer "<<i<<": "<<(1<<(7-i%8))<<endl;
             nullIndicator[i/8] += 1<<(7-i%8);
         }
     }
-    //cout<<nullIndicator.size()<<endl;
     for(unsigned i=0;i<nullIndicator.size();i++){
         ((char*)data)[length] = nullIndicator[i];
         length++;
     }
+    int lastPointer = 0;
     for(unsigned i=0;i<recordDescriptor.size();i++){
         if(pointers[i] != -1){
-        if(recordDescriptor[i].type == 2){
-            int l = i>0?pointers[i]-pointers[i-1]:pointers[i];
-            //cout<<i<<": "<<l<<endl;
-            memcpy((char*)data+length, &l, sizeof(int));
-            length += 4;
-            memcpy((char*)data+length, (char*)record+pos, l);
-            length += l;
-            pos += l;
-        } else{
-            memcpy((char*)data+length, (char*)record+pos, 4);
-            /*cout<<"ith num: "<<i<<endl;
-            for(int i=0;i<4;i++){
-                cout<<(int)((char*)record)[length+i]<<endl;
-            }*/
-            length += 4;
-            pos += 4;
-        }
+            if(recordDescriptor[i].type == 2){
+                int l = pointers[i]-lastPointer;
+                memcpy((char*)data+length, &l, sizeof(int));
+                length += 4;
+                memcpy((char*)data+length, (char*)record+pos, l);
+                length += l;
+                pos += l;
+            } else{
+                memcpy((char*)data+length, (char*)record+pos, 4);
+                length += 4;
+                pos += 4;
+            }
+            lastPointer = pointers[i];
         }
     }
 }
@@ -171,69 +151,113 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    unsigned length = 0;
+    unsigned short length = 0;
     char *record = (char *)data2record(data, recordDescriptor, length);
+    // leave at least sizeof(RID) space to make tomestone possible
+    length = max(length, (unsigned short)sizeof(RID));
     RC rc = insertPos(fileHandle, length, rid);
-    if (rc) {
+    if (rc != SUCCESS) {
+        delete[] record;
         return rc;
     }
     void *page = malloc(PAGE_SIZE);
+    memset(page,0,PAGE_SIZE);
     if (rid.pageNum == fileHandle.getNumberOfPages()) {
         //init the page
-        int zero = 0;
-        memcpy((char *)page + PAGE_SIZE - sizeof(int), &zero, sizeof(int));
-        memcpy((char *)page + PAGE_SIZE - 2 * sizeof(int), &zero, sizeof(int));
+        unsigned short zero = 0;
+        setFreeBegin(zero, page);
+        setNumSlots(zero, page);
         //update the page
         insert2data(page, record, length, rid.slotNum);
         delete[] record;
         //append new page
-        int rc = fileHandle.appendPage(page);
-        if (rc) {
+        RC rc = fileHandle.appendPage(page);
+        if (rc != SUCCESS) {
+            free(page);
             return rc;
         }
     }
     else
     {
-        fileHandle.readPage(rid.pageNum, page);
+        RC rc = fileHandle.readPage(rid.pageNum, page);
+        if (rc != SUCCESS) {
+            delete[] record;
+            free(page);
+            return rc;
+        }
         //update the page
         insert2data(page, record, length, rid.slotNum);
         delete[] record;
         //write page
-        int rc = fileHandle.writePage(rid.pageNum, page);
-        if (rc) {
+        rc = fileHandle.writePage(rid.pageNum, page);
+        if (rc != SUCCESS) {
+            free(page);
             return rc;
         }
     }
     free(page);
-    return 0;
+    return SUCCESS;
+}
+
+SlotDir RecordBasedFileManager::getSlotDir(const unsigned slotNum, const void* page) {
+    SlotDir slotDir;
+    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(short) - slotNum * sizeof(SlotDir), sizeof(SlotDir));
+    return slotDir;
+}
+
+void RecordBasedFileManager::getRecord(void* record, SlotDir slotDir, void* page) {
+    memcpy(record, (char *)page + slotDir.offset, slotDir.length);
+    return;
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     void *page = malloc(PAGE_SIZE);
-    int rc = fileHandle.readPage(rid.pageNum, page);
+    SlotDir* slotDir = new SlotDir;
+    RC rc = getPageSlotDir(fileHandle, rid, page, slotDir);
+    if (rc) {
+        free(page);
+        delete slotDir;
+        return rc;
+    }
+    
+    char *record = new char[slotDir->length];
+    getRecord(record, *slotDir, page);
+    record2data(record, recordDescriptor, data);
+    free(page);
+    delete slotDir;
+    delete[] record;
+    return 0;
+}
+
+RC RecordBasedFileManager::getPageSlotDir(FileHandle &fileHandle, const RID &rid, void* page, SlotDir* slotDirPtr) {
+    RC rc = fileHandle.readPage(rid.pageNum, page);
     if (rc) {
         return rc;
     }
-    SlotDir slotDir;
-    memcpy(&slotDir, (char *)page + PAGE_SIZE - 2 * sizeof(int) - rid.slotNum * sizeof(SlotDir), sizeof(SlotDir));
-    char *record = new char[slotDir.length];
-    memcpy((char *)record, (char *)page + slotDir.offset, slotDir.length);
-    record2data(record, recordDescriptor, data);
-    free(page);
-    delete[] record;
+    SlotDir slotDir = getSlotDir(rid.slotNum, page);
+    
+    if (slotDir.offset == USHRT_MAX) {
+        return -1; // deleted record.
+    }
+
+    if (slotDir.tombstone) {
+        RID realRid;
+        getRecord(&realRid, slotDir, page);
+        RC rc = fileHandle.readPage(realRid.pageNum, page);
+        if (rc) {
+            return rc;
+        }
+        slotDir = getSlotDir(realRid.slotNum, page);
+    }
+
+    memcpy(slotDirPtr, &slotDir, sizeof(SlotDir));
     return 0;
 }
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
     int attrNum = recordDescriptor.size();
-    // better to make it into a function?
     int nullIndSize = ceil((double)attrNum/(double)8);
-    vector<bitset<8>> nullBits;
-    for(int i = 0; i < nullIndSize; i++){
-        bitset<8> onebyte(*((char*)data+i));
-        nullBits.push_back(onebyte);
-    }
-    //
+    vector<bitset<8>> nullBits = nullIndicators(nullIndSize, data);
     int offset = nullIndSize;
     int intVal, charLen;
     float floatVal;
@@ -273,57 +297,956 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
     return 0;
 }
 
-RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, int length, RID &rid) {
+void RecordBasedFileManager::setSlotDir(void* page, unsigned slotNum, SlotDir slotDir) {
+    memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    return;
+}
+
+void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta) {
+    for(int i = start; i <= numSlots; i++)
+    {
+        SlotDir slotDir = getSlotDir(i, page);
+        if (slotDir.offset == USHRT_MAX) {
+            continue;
+        }
+        slotDir.offset += delta;
+        setSlotDir(page, i, slotDir);
+    }
+    return;
+}
+
+void RecordBasedFileManager::moveRecords(void* page, unsigned short destOffset, short freeBegin, short delta) {
+    memmove((char *)page + destOffset, (char *)page + destOffset - delta, freeBegin - destOffset + delta);
+    return;
+}
+
+RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
+    void *page = malloc(PAGE_SIZE);
+    memset(page,0,PAGE_SIZE);
+    RC rc = fileHandle.readPage(rid.pageNum, page);
+    if (rc) {
+        free(page);
+        return rc;
+    }
+    SlotDir slotDir = getSlotDir(rid.slotNum, page);
+    unsigned short recordLength = slotDir.length;
+    short numSlots = getNumSlots(page);
+    
+    if (slotDir.tombstone) {
+        RID realRid;
+        getRecord(&realRid, slotDir, page);
+        rc = deleteRecord(fileHandle, recordDescriptor, realRid);
+        if (rc) {
+            free(page);
+            return rc;
+        }
+        // Handle a rare situation that new record is on the same page as the tombstone.
+        if (realRid.pageNum == rid.pageNum) {
+            rc = fileHandle.readPage(rid.pageNum, page);
+            if (rc) {
+                free(page);
+                return rc;
+            }
+        }
+    }
+
+    short freeBegin = getFreeBegin(page);
+    moveRecords(page, slotDir.offset, freeBegin, -recordLength);
+    slotDir.offset = USHRT_MAX;
+    setSlotDir(page, rid.slotNum, slotDir);
+    updateSlotDirOffsets(page, rid.slotNum+1, numSlots, -recordLength);
+    
+    setFreeBegin(freeBegin-recordLength, page);
+    // do not update numSlots because we need that unchanged to find insertion position.
+    //write page
+    rc = fileHandle.writePage(rid.pageNum, page);
+    if (rc) {
+        free(page);
+        return rc;
+    }
+    free(page);
+    return 0;
+}
+
+void RecordBasedFileManager::setRecord(void* page, void* record, SlotDir slotDir) {
+    memcpy((char *)page + slotDir.offset, record, slotDir.length);
+    return;
+}
+
+RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
+    unsigned short newLength = 0;
+    void *page = malloc(PAGE_SIZE);
+    memset(page,0,PAGE_SIZE);
+    RC rc = fileHandle.readPage(rid.pageNum, page);
+    if (rc) {
+        free(page);
+        return rc;
+    }
+    SlotDir slotDir = getSlotDir(rid.slotNum, page);
+    char *record = (char *)data2record(data, recordDescriptor, newLength);
+    
+    bool tombstone = slotDir.tombstone;
+    if (tombstone) { //TODO: test this block! Not covered in test cases.
+        /*
+        1. get realRid
+        2. 
+            if realRid.pageNum has enough freeSpace
+                updateRecord(..., realRid)
+            else
+                updateRecord(..., realRid)
+                get tombstone record(newRid) on realPage
+                delete the tombstone record in realPage
+                set the tombstone record in current page to newRid
+        */
+        RID realRid;
+        getRecord(&realRid, slotDir, page);
+        void* realPage = malloc(PAGE_SIZE);
+        memset(realPage,0,PAGE_SIZE);
+        RC rc = fileHandle.readPage(realRid.pageNum, realPage);
+        if (rc) {
+            free(page);
+            delete[] record;
+            free(realPage);
+            return rc;
+        }
+        SlotDir realSlotDir = getSlotDir(realRid.slotNum, realPage);
+        if (freeSpace(realPage) + realSlotDir.length >= newLength) {
+            updateRecord(fileHandle, recordDescriptor, data, realRid);
+        }
+        else {
+            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            RID newRid;
+            getRecord(&newRid, realSlotDir, realPage);
+            deleteRecord(fileHandle, recordDescriptor, realRid);
+            setRecord(page, &newRid, slotDir);
+        }
+        free(realPage);
+    }
+    else
+    {
+        if (slotDir.length == newLength) {
+            setRecord(page, record, slotDir);
+        }
+        // have enough freeSpace
+        else if(freeSpace(page) + slotDir.length >= newLength) {
+            unsigned short length = slotDir.length;
+            slotDir.length = newLength;
+            setSlotDir(page, rid.slotNum, slotDir);
+            short freeBegin = getFreeBegin(page);
+            moveRecords(page, slotDir.offset + newLength, freeBegin, newLength - length);
+            setFreeBegin(freeBegin - length + newLength, page);
+            short numSlots = getNumSlots(page);
+            updateSlotDirOffsets(page, rid.slotNum+1, numSlots, newLength-length);
+            setRecord(page, record, slotDir);
+        }
+        else {
+            /*
+            1. find a new position (rid)
+            2. update old record to rid
+            3. update slotDir.length&tombstone & set slotDir
+            4. move records forward if length different
+            5. update slotDir offsets if length different
+            6. update freeBegin if length different
+            7. insert in new position
+            */
+            RID newRid;
+            RC rc = insertPos(fileHandle, newLength, newRid);
+            if (rc) {
+                free(page);
+                delete[] record;
+                return rc;
+            }
+            unsigned short length = slotDir.length;
+            slotDir.length = sizeof(RID);
+            slotDir.tombstone = true;
+            setSlotDir(page, rid.slotNum, slotDir);
+            setRecord(page, &newRid, slotDir);
+            short freeBegin = getFreeBegin(page);
+            
+            if (length != sizeof(RID)) {
+                moveRecords(page, slotDir.offset + sizeof(RID), freeBegin, sizeof(RID) - length);
+                short numSlots = getNumSlots(page);
+                updateSlotDirOffsets(page, rid.slotNum + 1, numSlots, sizeof(RID)-length);
+                setFreeBegin(freeBegin -length + sizeof(RID), page);
+            }
+
+            insertRecord(fileHandle, recordDescriptor, data, newRid);
+        }
+    }
+    // write page
+    rc = fileHandle.writePage(rid.pageNum, page);
+    if (rc) {
+        free(page);
+        delete[] record;
+        return rc;
+    }
+    free(page);
+    delete[] record;
+    return 0;
+}
+
+RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data) {
+    /*
+    1. get record
+    2. get attribute id
+    3. read attribute
+    */
+    void *page = malloc(PAGE_SIZE);
+    SlotDir* slotDir = new SlotDir;
+    RC rc = getPageSlotDir(fileHandle, rid, page, slotDir);
+    if (rc!=SUCCESS) {
+        free(page);
+        delete slotDir;
+        return rc;
+    }
+    char *record = new char[slotDir->length];
+    getRecord(record, *slotDir, page);
+    readAttributeFromRecord(record, slotDir->length, recordDescriptor, attributeName, data);
+    delete[] record;
+    free(page);
+    delete slotDir;
+    return 0;
+}
+
+RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
+    unsigned i;
+    short base = sizeof(short)*recordDescriptor.size()+4-1;
+    short startAddr = sizeof(short)*recordDescriptor.size()+4;
+    short endAddr = startAddr;
+    bool isNull = false;
+    for(i = 0; i < recordDescriptor.size(); i++)
+    {
+        short pointer;
+        memcpy(&pointer, (char*)record+i*sizeof(short)+4, sizeof(short));
+        if (recordDescriptor[i].name == attributeName) {
+            if(pointer == -1){
+                isNull = true;
+            } else{
+                startAddr = endAddr+1;
+                endAddr = pointer+base;
+            }
+            break;
+        } else{
+            if(pointer != -1){
+                startAddr = endAddr+1;
+                endAddr = pointer+base;
+            }
+        }
+    }
+    
+    if (i == recordDescriptor.size()) {
+        return -1;
+    }
+    
+    char nullIndicator;
+    if(isNull){
+        nullIndicator = 255;
+    } else{
+        nullIndicator = 0;
+    }
+    ((char*)data)[0] = nullIndicator;
+    if(recordDescriptor[i].type == 2){
+        length = endAddr-startAddr;
+        memcpy((char*)data+1, &length, sizeof(int));
+        memcpy((char*)data+5, (char*)record+startAddr, length);
+    } else{
+        length = 4;
+        memcpy((char*)data+1, (char*)record+startAddr, 4);
+    }
+    return 0;
+}
+
+RBFM_ScanIterator::RBFM_ScanIterator() {
+}
+
+RBFM_ScanIterator::~RBFM_ScanIterator(){
+}
+
+RC RBFM_ScanIterator::close(){
+    //free(value);
+    free(loadedPage);
+    return SUCCESS;
+}
+
+RC RBFM_ScanIterator::getNextRid(RID &rid) {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    if (nextRid.pageNum >= numPages) {
+        return RBFM_EOF;
+    }
+    if (nextRid.slotNum > numSlots) {
+        nextRid.pageNum++;
+        RC rc = fileHandle->readPage(nextRid.pageNum, loadedPage);
+        if (rc != SUCCESS) {
+            return -1;
+        }
+        numSlots = rbfm->getNumSlots(loadedPage);
+        nextRid.slotNum = 1;
+        return getNextRid(rid);
+    }
+    rid.pageNum = nextRid.pageNum;
+    rid.slotNum = nextRid.slotNum;
+    nextRid.slotNum++;
+    return SUCCESS;
+}
+
+RC RecordBasedFileManager::concatData(const void* record, const vector<Attribute> &recordDescriptor, const vector<string> &attributeName, void* data){
+    if(recordDescriptor.size() == attributeName.size()){
+        record2data(record,recordDescriptor,data);
+        return SUCCESS;
+    }
+    int nullIndSize = ceil(((double)attributeName.size())/8);
+    char* nullIndicator = new char[nullIndSize];
+    memset(nullIndicator,0,nullIndSize);
+    void* dataBody = malloc(4000);
+    int offset = 0;
+    for(int i=0;i<attributeName.size();i++){
+        Attribute targetAttr;
+        for(int j=0;j<recordDescriptor.size();j++){
+            if(recordDescriptor[j].name == attributeName[i]){
+                targetAttr = recordDescriptor[j];
+                break;
+            }
+        }
+        string attrName = attributeName[i];
+        int length = targetAttr.length;
+        void* fieldData = malloc(4000);
+        memset(fieldData,0,4000);
+        RC rc = readAttributeFromRecord(record, length, recordDescriptor, attrName, fieldData);
+        if(rc != SUCCESS){
+            return rc;
+        }
+        char filedNullInd;
+        memcpy(&filedNullInd,(char*)fieldData,1);
+        memcpy((char*)dataBody+offset, fieldData+1, length);
+        offset += length;
+        if(filedNullInd > 0){
+            nullIndicator[i/8] += 1<<(7-i%8);
+        }
+        free(fieldData);
+    }
+    memcpy((char*)data,nullIndicator,nullIndSize);
+    memcpy((char*)data+nullIndSize,(char*)dataBody,offset);
+    free(dataBody);
+    delete[] nullIndicator;
+    return SUCCESS;
+}
+
+RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    SlotDir slotDir;
+    do
+    {
+        if(getNextRid(rid) == RBFM_EOF){
+            return RBFM_EOF;
+        }
+        fileHandle->readPage(rid.pageNum, loadedPage);
+        slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
+    } while (slotDir.tombstone || slotDir.offset == USHRT_MAX);
+    char *record = new char[slotDir.length];
+    rbfm->getRecord(record, slotDir, loadedPage);
+    unsigned i;
+    for(i = 0; i < recordDescriptor.size(); i++)
+    {
+        if (recordDescriptor[i].name == conditionAttribute) {
+            break;
+        }
+    }
+    int conditionDataLength = recordDescriptor[i].length;
+    int nullIndSize = ceil(((double)attributeNames.size())/8);
+    char nullInd;
+    void* conditionData = malloc(conditionDataLength);
+
+    if (compOp != 6) {
+        if (i == recordDescriptor.size()) {
+            delete[] record;
+            return -1;
+        }
+        
+        if(recordDescriptor[i].type == 2){
+            conditionDataLength += 4;
+        }
+        conditionDataLength += recordDescriptor[i].length;
+        memset(conditionData, 0, conditionDataLength);
+        rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
+        memcpy(&nullInd, (char*)conditionData, 1);
+    }
+
+    if(compOp==CompOp::EQ_OP){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val == *(int*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val == *(float*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val == *(string*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            return -1;
+        }
+    } else if(compOp==CompOp::LT_OP){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val < *(int*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val < *(float*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val < *(string*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            delete[] record;
+            free(conditionData);
+            return -1;
+        }
+    } else if(compOp==CompOp::LE_OP){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val <= *(int*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val <= *(float*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val <= *(string*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            delete[] record;
+            free(conditionData);
+            return -1;
+        }
+    } else if(compOp==CompOp::GT_OP){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd != 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val > *(int*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val > *(float*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val > *(string*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            delete[] record;
+            free(conditionData);
+            return -1;
+        }
+    } else if(compOp==CompOp::GE_OP){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val >= *(int*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val >= *(float*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val >= *(string*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else{
+            delete[] record;
+            free(conditionData);
+            return -1;
+        }
+    } else if(compOp==CompOp::NE_OP){
+        if(recordDescriptor[i].type==0){
+            int val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val != *(int*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==1){
+            float val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                memcpy(&val, (char*)conditionData+1, 4);
+                if(val != *(float*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        } else if(recordDescriptor[i].type==2){
+            string val;
+            if(nullInd == 0){
+                delete[] record;
+                free(conditionData);
+                return getNextRecord(rid, data);
+            } else{
+                int length;
+                memcpy(&length, (char*)conditionData+1, 4);
+                memcpy(&val, (char*)conditionData+5, length);
+                if(val != *(string*)(value)){
+                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                    if(rc != SUCCESS){
+                        return rc;
+                    }
+                    delete[] record;
+                    free(conditionData);
+                    return 0;
+                } else{
+                    delete[] record;
+                    free(conditionData);
+                    return getNextRecord(rid, data);
+                }
+            }
+        }else{
+            delete[] record;
+            free(conditionData);
+            return -1;
+        }
+    } else if(compOp == CompOp::NO_OP){
+        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+        if(rc != SUCCESS){
+            return rc;
+        }
+        //record2data((void*)record, recordDescriptor, data);
+        //rbfm->printRecord(recordDescriptor, data);
+        delete[] record;
+        free(conditionData);
+        return SUCCESS;
+    } else{
+        delete[] record;
+        free(conditionData);
+        return -1;
+    }
+    delete[] record;
+    free(conditionData);
+    return 0;
+}
+
+RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator) {
+    rbfm_ScanIterator.fileHandle = &fileHandle;
+    rbfm_ScanIterator.recordDescriptor = recordDescriptor;
+    rbfm_ScanIterator.conditionAttribute = conditionAttribute;
+    rbfm_ScanIterator.compOp = compOp;
+    rbfm_ScanIterator.value = (void *)value;
+    rbfm_ScanIterator.attributeNames = attributeNames;
+    rbfm_ScanIterator.rbfm = RecordBasedFileManager::instance();
+    rbfm_ScanIterator.numPages = rbfm_ScanIterator.fileHandle->getNumberOfPages();
+    rbfm_ScanIterator.nextRid.pageNum = 0;
+    rbfm_ScanIterator.loadedPage = malloc(PAGE_SIZE); //TODO: free when close()
+    RC rc = rbfm_ScanIterator.fileHandle->readPage(rbfm_ScanIterator.nextRid.pageNum, rbfm_ScanIterator.loadedPage);
+    if (rc != SUCCESS) {
+        return rc;
+    }
+    rbfm_ScanIterator.numSlots = rbfm_ScanIterator.rbfm->getNumSlots(rbfm_ScanIterator.loadedPage);
+    rbfm_ScanIterator.nextRid.slotNum = 1;
+    return 0;
+}
+
+RC RecordBasedFileManager::insertPos(FileHandle &fileHandle, unsigned short length, RID &rid) {
     int curPage = fileHandle.getNumberOfPages() - 1;
     void *data = malloc(PAGE_SIZE);
     int pageNum;
+    short numSlots;
     
     for (pageNum = curPage; pageNum >= 0; pageNum--)
     {
-        int rc = fileHandle.readPage(pageNum, data);
-        if (rc) {
+        RC rc = fileHandle.readPage(pageNum, data);
+        if (rc != SUCCESS) {
+            free(data);
             return rc;
         }
         if (freeSpace(data) >= length + sizeof(SlotDir)) {
+            numSlots = getNumSlots(data);
             break;
         }
     }
 
     if (pageNum < 0) {
         pageNum = curPage + 1;
-        rid.slotNum = 1;
+        numSlots = 0;
+        if (PAGE_SIZE < length + sizeof(SlotDir)) {
+            free(data);
+            return -1; // the record is too long to fit in an empty page.
+        }
     }
-    else {
-        memcpy(&rid.slotNum, (char *)data + PAGE_SIZE - 2 * sizeof(int), sizeof(int));
-        rid.slotNum++;
+    
+    SlotDir slotDir;
+    
+    for(int i = 1; i <= numSlots; i++)
+    {
+        slotDir = getSlotDir(i, data);
+        
+        if (slotDir.offset == USHRT_MAX) {
+            rid.slotNum = i;
+            rid.pageNum = pageNum;
+            free(data);
+            return 0;
+        }
     }
+
+    rid.slotNum = ++numSlots;
     rid.pageNum = pageNum;
 
     free(data);
     return 0;
 }
 
+short RecordBasedFileManager::getFreeBegin(const void* page) {
+    short freeBegin;
+    memcpy(&freeBegin, (char *)page + PAGE_SIZE - sizeof(short), sizeof(short));
+    return freeBegin;
+}
+
+short RecordBasedFileManager::getNumSlots(const void* page) {
+    short numSlots;
+    memcpy(&numSlots, (char *)page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
+    return numSlots;
+}
+
 unsigned RecordBasedFileManager::freeSpace(const void *data) {
-    int numSlots;
-    memcpy(&numSlots, (char *)data + PAGE_SIZE - 2 * sizeof(int), sizeof(int));
-    int freeBegin;
-    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
-    int freeEnd = PAGE_SIZE - 2 * sizeof(int) - numSlots * sizeof(SlotDir);
+    short numSlots = getNumSlots(data);
+    short freeBegin = getFreeBegin(data);
+    int freeEnd = PAGE_SIZE - 2 * sizeof(short) - numSlots * sizeof(SlotDir);
     return freeEnd - freeBegin;
 }
 
-void RecordBasedFileManager::insert2data(void *data, char *record, unsigned length, int slotNum) {
-    // Insert record.
-    unsigned freeBegin;
-    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(int), sizeof(int));
-    memcpy((char *)data + freeBegin, record, length);
+void RecordBasedFileManager::setFreeBegin(unsigned short freeBegin, void* page) {
+    memcpy((char *)page + PAGE_SIZE - sizeof(short), &freeBegin, sizeof(short));
+    return;
+}
+
+void RecordBasedFileManager::setNumSlots(unsigned short numSlots, void* page) {
+    memcpy((char *)page + PAGE_SIZE - 2 * sizeof(short), &numSlots, sizeof(short));
+    return;
+}
+
+void RecordBasedFileManager::insert2data(void *data, char *record, unsigned short length, unsigned slotNum) {
+    unsigned short freeBegin;
+    memcpy(&freeBegin, (char *)data + PAGE_SIZE - sizeof(short), sizeof(short));
     // Insert SoltDir.
-    SlotDir slotDir = {freeBegin, length};
-    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int) - slotNum * sizeof(SlotDir), &slotDir, sizeof(SlotDir));
+    SlotDir slotDir = {false, freeBegin, length};
+    setSlotDir(data, slotNum, slotDir);
+    // Insert record.
+    setRecord(data, record, slotDir);
     // Update free space.
     freeBegin += length;
-    memcpy((char *)data + PAGE_SIZE - sizeof(int), &freeBegin, sizeof(int));
-    // Update num of slots.
-    memcpy((char *)data + PAGE_SIZE - 2 * sizeof(int), &slotNum, sizeof(int));
+    setFreeBegin(freeBegin, data);
+    // Update num of slots.    
+    short numSlots = getNumSlots(data);
+    if ((unsigned short)numSlots == slotNum - 1) {
+        setNumSlots(slotNum, data);
+    }
+
     return;
 }

@@ -4,22 +4,26 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
+#include <map>
 
 #include "../rbf/rbfm.h"
 
 using namespace std;
 
-# define RM_EOF (-1)  // end of a scan operator
-
+# define RM_EOF RBFM_EOF  // end of a scan operator
+class RelationManager;
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
 public:
-  RM_ScanIterator() {};
-  ~RM_ScanIterator() {};
-
+  RM_ScanIterator(){};
+  ~RM_ScanIterator();
+  RBFM_ScanIterator rbfmIter;
+  RelationManager* rm;
+  FileHandle rmFileHandle;
   // "data" follows the same format as RelationManager::insertTuple()
-  RC getNextTuple(RID &rid, void *data) { return RM_EOF; };
-  RC close() { return -1; };
+  RC getNextTuple(RID &rid, void *data);
+  RC close();
 };
 
 
@@ -69,10 +73,19 @@ public:
   RC dropAttribute(const string &tableName, const string &attributeName);
 
 
-protected:
+//protected:
   RelationManager();
   ~RelationManager();
+private:
+    string tableFileName = "Tables";
+    string columnFileName = "Columns";
+    RecordBasedFileManager* rbfm;
+    vector<Attribute> tableAttr;
+    vector<Attribute> columnAttr;
 
+    RC generateTableRecord(int tableId, string tableName, string fileName, void* data, int& length);
+    RC generateColumnRecord(int tableId, string columnName, int columnType, int columnLength, int columnPos, void* data, int& length);
+    RC insertTupleHelper(const string &tableName, vector<Attribute>& attributes, const void* data, RID& rid);
 };
 
 #endif
