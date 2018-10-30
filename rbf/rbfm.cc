@@ -581,7 +581,7 @@ RC RBFM_ScanIterator::getNextRid(RID &rid) {
         }
         numSlots = rbfm->getNumSlots(loadedPage);
         nextRid.slotNum = 1;
-        getNextRid(rid);
+        return getNextRid(rid);
     }
     rid.pageNum = nextRid.pageNum;
     rid.slotNum = nextRid.slotNum;
