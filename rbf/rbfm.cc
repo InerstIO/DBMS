@@ -302,11 +302,11 @@ void RecordBasedFileManager::setSlotDir(void* page, unsigned slotNum, SlotDir sl
     return;
 }
 
-void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta) {
-    for(int i = start; i <= numSlots; i++)
+void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned afterOffset, short numSlots, short delta) {
+    for(int i = 1; i <= numSlots; i++)
     {
         SlotDir slotDir = getSlotDir(i, page);
-        if (slotDir.offset == USHRT_MAX) {
+        if (slotDir.offset == USHRT_MAX || slotDir.offset <= afterOffset) {
             continue;
         }
         slotDir.offset += delta;
@@ -352,9 +352,10 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
     short freeBegin = getFreeBegin(page);
     moveRecords(page, slotDir.offset, freeBegin, -recordLength);
+    unsigned short deletedOffset = slotDir.offset;
     slotDir.offset = USHRT_MAX;
     setSlotDir(page, rid.slotNum, slotDir);
-    updateSlotDirOffsets(page, rid.slotNum+1, numSlots, -recordLength);
+    updateSlotDirOffsets(page, deletedOffset, numSlots, -recordLength);
     
     setFreeBegin(freeBegin-recordLength, page);
     // do not update numSlots because we need that unchanged to find insertion position.
@@ -436,7 +437,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             moveRecords(page, slotDir.offset + newLength, freeBegin, newLength - length);
             setFreeBegin(freeBegin - length + newLength, page);
             short numSlots = getNumSlots(page);
-            updateSlotDirOffsets(page, rid.slotNum+1, numSlots, newLength-length);
+            updateSlotDirOffsets(page, slotDir.offset, numSlots, newLength-length);
             setRecord(page, record, slotDir);
         }
         else {
@@ -466,7 +467,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             if (length != sizeof(RID)) {
                 moveRecords(page, slotDir.offset + sizeof(RID), freeBegin, sizeof(RID) - length);
                 short numSlots = getNumSlots(page);
-                updateSlotDirOffsets(page, rid.slotNum + 1, numSlots, sizeof(RID)-length);
+                updateSlotDirOffsets(page, slotDir.offset, numSlots, sizeof(RID)-length);
                 setFreeBegin(freeBegin -length + sizeof(RID), page);
             }
 
