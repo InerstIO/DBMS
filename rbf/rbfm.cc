@@ -412,10 +412,20 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         }
         SlotDir realSlotDir = getSlotDir(realRid.slotNum, realPage);
         if (freeSpace(realPage) + realSlotDir.length >= newLength) {
-            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            rc = updateRecord(fileHandle, recordDescriptor, data, realRid);
+            free(page);
+            delete[] record;
+            free(realPage);
+            return rc;
         }
         else {
-            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            rc = updateRecord(fileHandle, recordDescriptor, data, realRid);
+            if (rc) {
+                free(page);
+                delete[] record;
+                free(realPage);
+                return rc;
+            }
             RID newRid;
             getRecord(&newRid, realSlotDir, realPage);
             deleteRecord(fileHandle, recordDescriptor, realRid);
