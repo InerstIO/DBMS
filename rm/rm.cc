@@ -185,6 +185,9 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 
 RC RelationManager::deleteTable(const string &tableName)
 {
+    if(tableName==tableFileName || tableName==columnFileName){
+        return -1;
+    }
     //delete file
     rbfm->destroyFile(tableName);
     //delete items in table
@@ -198,55 +201,59 @@ RC RelationManager::deleteTable(const string &tableName)
     if(rc != SUCCESS) return -1;
     RID rid;
     void* data = malloc(4000);
-    void* record = malloc(4000);
     int table_id = -1;
-    //cout<<"del1"<<endl;
-    while(!rbfmIter.getNextRecord(rid, record)){
-        rbfm->readAttribute(fileHandle, tableAttr, rid, "table-name", data);
+    cout<<"dt1"<<endl;
+    while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
         int length;
-        memcpy(&length, (char*)data+1, sizeof(int));
-        //cout<<"length: "<<length<<endl;
-        bool isTableSame = true;
-        if(tableName.size() == length){
-            for(int i=0;i<length;i++){
-                if(*((char*)data+i) != tableName[i]){
-                    cout<<*((char*)data+i)<<", ";
-                    isTableSame = false;
-                    break;
-                }
-            }
-            cout<<endl;
-        } else{
-            isTableSame = false;
-        }
+        int pos = 1;
+        memcpy(&table_id, (char*)data+pos, sizeof(int));
+        pos += 4;
+        memcpy(&length, (char*)data+pos, sizeof(int));
+        pos += 4;
+        cout<<"length: "<<length<<endl;
+        string targetTableName;
+        targetTableName.resize(length);
+        memcpy((char*)targetTableName.data(),data+pos,length);
+        pos += length;
+cout<<"targetTableName: "<<targetTableName<<endl;
+        bool isTableSame = (targetTableName==tableName);
         if(isTableSame){
-            memset(data,0,4000);
-            rbfm->readAttribute(fileHandle, tableAttr, rid, "table-id", data);
-            memcpy(&table_id, (char*)data+1, sizeof(int));
-            rbfm->deleteRecord(fileHandle, tableAttr, rid);
+            cout<<"table is same"<<endl;
+            rc = rbfm->deleteRecord(fileHandle, tableAttr, rid);
+            if(rc != SUCCESS){
+                return -1;
+            }
             break;
         }
         memset(data, 0, 4000);
-        memset(record,0,4000);
+    }
+    if(table_id<0){
+        return table_id;
     }
     //cout<<"del2"<<endl;
+    cout<<"victim table id: "<<table_id<<endl;
     rbfm->closeFile(fileHandle);
     rbfm->openFile(columnFileName, fileHandle);
     rbfmIter.close();
     vector<string> attrs;
-    attrs.push_back("table-id");
+    for(int i=0;i<columnAttr.size();i++)
+        attrs.push_back(columnAttr[i].name);
     rc = rbfm->scan(fileHandle, columnAttr, "", NO_OP, NULL, attrs, rbfmIter);
     if(rc != SUCCESS) return -1;
     //cout<<"del3"<<endl;
+    memset(data,0,4000);
+    cout<<"dc1"<<endl;
     while(!rbfmIter.getNextRecord(rid, data)){
+        cout<<"dc2"<<endl;
         int id;
-        char* d = (char*)data;
-        memcpy(&id, d+1, sizeof(int));
+        memcpy(&id, (char*)data+1, sizeof(int));
+        cout<<"id: "<<id<<endl;
         if(id == table_id){
             rbfm->deleteRecord(fileHandle, columnAttr, rid);
-            free(data);
         }
+        memset(data,0,4000);
     }
+    free(data);
     rbfm->closeFile(fileHandle);
     rbfmIter.close();
     return SUCCESS;
@@ -269,7 +276,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     memset(data,0,4000);
     RID rid;
     int tableId = -1;
-    while(!rbfmIter.getNextRecord(rid, data)){
+    while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
         int pos = 1;
         int id;
         memcpy(&id, (char*)data+pos, sizeof(int));
