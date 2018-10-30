@@ -363,7 +363,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     cout<<"dr4"<<endl;
     updateSlotDirOffsets(page, rid.slotNum+1, numSlots, -recordLength);
     
-    setFreeBegin(freeBegin+recordLength, page);
+    setFreeBegin(freeBegin-recordLength, page);
     // do not update numSlots because we need that unchanged to find insertion position.
 cout<<"dr5"<<endl;
     //write page
