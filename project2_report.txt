@@ -10,11 +10,22 @@ gcc version : 5.4.0 20160609
 
 2. Meta-data
 - Show your meta-data design (Tables and Columns table) and information about each column.
-
+There are two tables that store all the table information.
+The first one is called Tables. We name both table and filename for this table as Tables. There are three fields in this table, which are table-id(int), table-name(varchar(50)), and file-name(varchar(50)).
+And in Columns, we have the following fields: table-id(int), column-name(varchar(50)), column-type(int), column-length(int), and column-position(int)
 
 3. Internal Record Format
 - Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that your team hasn't implemented this feature.
+We use the following format to store the records:
+---------------------------------------------
+|num|pointer1|pointer2|...|value1|value2|...|
+---------------------------------------------
+Num stores how many fields are in this record. We store it as an integer, which means it occupies 4 bytes.
+We use 2 bytes to store each pointer. Since there are 16 digits in 2 bytes, and 2^16>4096, we can use 0xffff value to represent null without worries. If a pointer is not null, it will point to the location at the end of the value it points to. If a field is null, it will not occupy any space in value part.
+To read a field, we can find its pointer in O(1) time since we can know the rank of the field according to recordDescriptor. If the value of pointer is 0xffff, we return a null directly. Otherwise, if it is not the first field, assuming it is the kth field, we can return the data locates between pointers(k-1) to pointers(k). This costs O(1) time. If we need to read the first field, we return the data between num*2 to first pointer. It is still O(1) time. Therefore, we achieve O(1) read time complexity by using this format. 
+
 - Describe how you store a VarChar field.
+|length(int)|value
 - Describe how you deal with an update and delete.
 
 
