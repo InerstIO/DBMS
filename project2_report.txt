@@ -84,7 +84,9 @@ update the freeSpace on that page
 
 5. File Format
 - Show your file format design
-
+In our file system, we have two files called Tables and Columns to store the information of all the tables. The information of these two files are introduced in the metadata part. 
+When creating a tbale, we firstly scan Tables to get all the existing table ids, and assign the smallest missing possitive number as the target id for the new table. Then, we insert the information of the new table to Tables, and information of all its columns to Columns. In the end, we create the new table file.
+When deleting a table, we firstly scan Tables to find the table id for the victim table, and delete the table in Tables. Then we delete all its column information in Columns according to this table id. In the end, we delete the victim table file.
 
 
 6. Implementation Detail
