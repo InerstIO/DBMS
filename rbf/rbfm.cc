@@ -523,18 +523,20 @@ RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned 
     unsigned i;
     short base = sizeof(short)*recordDescriptor.size()+4-1;
     short startAddr = sizeof(short)*recordDescriptor.size()+4;
-    short endAddr = startAddr;
+    short endAddr = startAddr-1;
     bool isNull = false;
     for(i = 0; i < recordDescriptor.size(); i++)
     {
         short pointer;
         memcpy(&pointer, (char*)record+i*sizeof(short)+4, sizeof(short));
+                //cout<<pointer<<", ";
         if (recordDescriptor[i].name == attributeName) {
             if(pointer == -1){
                 isNull = true;
             } else{
                 startAddr = endAddr+1;
                 endAddr = pointer+base;
+               // cout<<startAddr<<"--"<<base<<"+"<<pointer<<endl;
             }
             break;
         } else{
@@ -544,7 +546,7 @@ RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned 
             }
         }
     }
-    
+    //cout<<endl;
     if (i == recordDescriptor.size()) {
         return -1;
     }
@@ -557,7 +559,8 @@ RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned 
     }
     ((char*)data)[0] = nullIndicator;
     if(recordDescriptor[i].type == 2){
-        length = endAddr-startAddr;
+        length = endAddr-startAddr+1;
+        //cout<<length<<endl;
         memcpy((char*)data+1, &length, sizeof(int));
         memcpy((char*)data+5, (char*)record+startAddr, length);
     } else{
@@ -680,13 +683,18 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         conditionData = malloc(conditionDataLength);
         memset(conditionData, 0, conditionDataLength);
         rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
+        //vector<Attribute> vec;
+        //vec.push_back(recordDescriptor[i]);
+        //void* td = malloc(200);
+        //record2data(record,recordDescriptor,td);
+        //rbfm->printRecord(vec, conditionData);
         memcpy(&nullInd, (char*)conditionData, 1);
     }
 
     if(compOp==CompOp::EQ_OP){
         if(recordDescriptor[i].type==0){
             int val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -708,7 +716,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==1){
             float val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -730,15 +738,21 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==2){
             string val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
                 memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val == *(string*)(value)){
+                val.resize(length);
+                memcpy((char*)val.data(), (char*)conditionData+5, length);
+                string valueStr;
+                int valueLength;
+                memcpy(&valueLength, (char*)value, sizeof(int));
+                valueStr.resize(valueLength);
+                memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                if(val == valueStr){
                     RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
                     if(rc != SUCCESS){
                         return rc;
@@ -758,7 +772,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     } else if(compOp==CompOp::LT_OP){
         if(recordDescriptor[i].type==0){
             int val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -780,7 +794,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==1){
             float val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -802,15 +816,21 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==2){
             string val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
                 memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val < *(string*)(value)){
+                val.resize(length);
+                memcpy((char*)val.data(), (char*)conditionData+5, length);
+                string valueStr;
+                int valueLength;
+                memcpy(&valueLength, (char*)value, sizeof(int));
+                valueStr.resize(valueLength);
+                memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                if(val < valueStr){
                     RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
                     if(rc != SUCCESS){
                         return rc;
@@ -832,7 +852,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     } else if(compOp==CompOp::LE_OP){
         if(recordDescriptor[i].type==0){
             int val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -854,7 +874,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==1){
             float val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -876,15 +896,21 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==2){
             string val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
                 memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val <= *(string*)(value)){
+                val.resize(length);
+                memcpy((char*)val.data(), (char*)conditionData+5, length);
+                string valueStr;
+                int valueLength;
+                memcpy(&valueLength, (char*)value, sizeof(int));
+                valueStr.resize(valueLength);
+                memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                if(val <= valueStr){
                     RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
                     if(rc != SUCCESS){
                         return rc;
@@ -928,7 +954,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==1){
             float val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -950,15 +976,21 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==2){
             string val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
                 memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val > *(string*)(value)){
+                val.resize(length);
+                memcpy((char*)val.data(), (char*)conditionData+5, length);
+                string valueStr;
+                int valueLength;
+                memcpy(&valueLength, (char*)value, sizeof(int));
+                valueStr.resize(valueLength);
+                memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                if(val > valueStr){
                     RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
                     if(rc != SUCCESS){
                         return rc;
@@ -980,7 +1012,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     } else if(compOp==CompOp::GE_OP){
         if(recordDescriptor[i].type==0){
             int val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -1002,7 +1034,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==1){
             float val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -1024,15 +1056,21 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==2){
             string val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
                 memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val >= *(string*)(value)){
+                val.resize(length);
+                memcpy((char*)val.data(), (char*)conditionData+5, length);
+                string valueStr;
+                int valueLength;
+                memcpy(&valueLength, (char*)value, sizeof(int));
+                valueStr.resize(valueLength);
+                memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                if(val >= valueStr){
                     RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
                     if(rc != SUCCESS){
                         return rc;
@@ -1054,7 +1092,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     } else if(compOp==CompOp::NE_OP){
         if(recordDescriptor[i].type==0){
             int val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -1076,7 +1114,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==1){
             float val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
@@ -1098,15 +1136,21 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             }
         } else if(recordDescriptor[i].type==2){
             string val;
-            if(nullInd == 0){
+            if(nullInd != 0){
                 delete[] record;
                 free(conditionData);
                 return getNextRecord(rid, data);
             } else{
                 int length;
                 memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val != *(string*)(value)){
+                val.resize(length);
+                memcpy((char*)val.data(), (char*)conditionData+5, length);
+                string valueStr;
+                int valueLength;
+                memcpy(&valueLength, (char*)value, sizeof(int));
+                valueStr.resize(valueLength);
+                memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                if(val != valueStr){
                     RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
                     if(rc != SUCCESS){
                         return rc;
