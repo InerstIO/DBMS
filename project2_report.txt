@@ -78,7 +78,7 @@ update the freeSpace on that page
 
 6. Implementation Detail
 - Other implementation details goes here.
-
+getNextRecord is implemented in a iterative way instead of recursive way since we might have stack overflow when using recursion.
 
 7. Other (optional)
 - Freely use this section to tell us about things that are related to the project 2, but not related to the other sections (optional)
