@@ -653,7 +653,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         if(getNextRid(rid) == RBFM_EOF){
             return RBFM_EOF;
         }
-        fileHandle->readPage(rid.pageNum, loadedPage);
         slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
     } while (slotDir.tombstone || slotDir.offset == USHRT_MAX);
     char *record = new char[slotDir.length];
