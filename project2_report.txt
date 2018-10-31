@@ -1,11 +1,11 @@
 1. Basic information
-Team number (e.g., 01) : 
-#1 Student ID : 
-#1 Student Name : 
-#2 Student ID : 
-#2 Student Name : 
-OS (bit) :
-gcc version :
+Team number (e.g., 01) : 23
+#1 Student ID : 20689831
+#1 Student Name : Yuxuan Hao
+#2 Student ID : 25245625
+#2 Student Name : Yu Feng
+OS (bit) : Ubuntu 16.04.3 x64
+gcc version : 5.4.0 20160609
 
 
 2. Meta-data
@@ -21,7 +21,55 @@ gcc version :
 4. Page Format
 - Show your page format design.
 - Describe how you deal with an update and delete.
+----------------------------------------------
+record1|record2|...|realRid|...|recordN|
+.
+free space
+.
+      |SlotDirN|...|Tombstone|...|SlotDir1|N|F
+----------------------------------------------
+Page format design:
+Records are appended to the free space offset in the page (in the top part of the page) until there is not enough free space left in that page.
+The last byte of the page is used to store the the offset of free space, so that new records can be appended at that offset, let's call it F.
+The byte before the last byte is used to store the number of records in that page, let's call it N.
+Before that byte, there are N slot directories indicating the offset, length and tombstone of the records so that we can get the position of the record in O(1) time.
+By using F and N, we can easily get the amount of free space in that page = PAGE_SIZE - 2 * sizeof(int) - N * sizeof(SlotDir) - F.
 
+Update:
+if rid does not point to a tombstone:
+    if newRecord has the same length as old one:
+        update record directly
+    elif current page has enough free space for newRecord:
+        1. move the records after the record we want to update to the right
+        2. update the freeSpace on that page
+        3. update the offset in the SlotDirs of the records that has been moved
+        4. update record
+    else (current page does not have enough free space for newRecord):
+        1. find a new position (rid)
+        2. update old record to rid
+        3. update slotDir.length & tombstone & set slotDir
+        4. move records forward if length different
+        5. update slotDir offsets if length different
+        6. update freeBegin if length different
+        7. insert in new position
+else (we want to update a tombstone):
+    get realRid
+    if realRid.pageNum has enough freeSpace:
+        updateRecord(..., realRid) [recursive call this function]
+    else:
+        1. updateRecord(..., realRid) [recursive call this function]
+        2. get tombstone record(newRid) on realPage
+        3. delete the tombstone record in realPage
+        4. set the tombstone record in current page to newRid
+
+Delete:
+if we want to delete a rid pointed to a tombstone:
+    get realRid
+    deleteRecord(..., realRid) [recursive call this function]
+move the records after the record we want to delete to the left
+update the slotDir to indicate that the record has been deleted
+update the offset in the SlotDirs of the records that has been moved
+update the freeSpace on that page
 
 5. File Format
 - Show your file format design

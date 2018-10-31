@@ -302,11 +302,11 @@ void RecordBasedFileManager::setSlotDir(void* page, unsigned slotNum, SlotDir sl
     return;
 }
 
-void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta) {
-    for(int i = start; i <= numSlots; i++)
+void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned afterOffset, short numSlots, short delta) {
+    for(int i = 1; i <= numSlots; i++)
     {
         SlotDir slotDir = getSlotDir(i, page);
-        if (slotDir.offset == USHRT_MAX) {
+        if (slotDir.offset == USHRT_MAX || slotDir.offset <= afterOffset) {
             continue;
         }
         slotDir.offset += delta;
@@ -352,9 +352,10 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
     short freeBegin = getFreeBegin(page);
     moveRecords(page, slotDir.offset, freeBegin, -recordLength);
+    unsigned short deletedOffset = slotDir.offset;
     slotDir.offset = USHRT_MAX;
     setSlotDir(page, rid.slotNum, slotDir);
-    updateSlotDirOffsets(page, rid.slotNum+1, numSlots, -recordLength);
+    updateSlotDirOffsets(page, deletedOffset, numSlots, -recordLength);
     
     setFreeBegin(freeBegin-recordLength, page);
     // do not update numSlots because we need that unchanged to find insertion position.
@@ -411,10 +412,20 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         }
         SlotDir realSlotDir = getSlotDir(realRid.slotNum, realPage);
         if (freeSpace(realPage) + realSlotDir.length >= newLength) {
-            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            rc = updateRecord(fileHandle, recordDescriptor, data, realRid);
+            free(page);
+            delete[] record;
+            free(realPage);
+            return rc;
         }
         else {
-            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            rc = updateRecord(fileHandle, recordDescriptor, data, realRid);
+            if (rc) {
+                free(page);
+                delete[] record;
+                free(realPage);
+                return rc;
+            }
             RID newRid;
             getRecord(&newRid, realSlotDir, realPage);
             deleteRecord(fileHandle, recordDescriptor, realRid);
@@ -436,7 +447,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             moveRecords(page, slotDir.offset + newLength, freeBegin, newLength - length);
             setFreeBegin(freeBegin - length + newLength, page);
             short numSlots = getNumSlots(page);
-            updateSlotDirOffsets(page, rid.slotNum+1, numSlots, newLength-length);
+            updateSlotDirOffsets(page, slotDir.offset, numSlots, newLength-length);
             setRecord(page, record, slotDir);
         }
         else {
@@ -466,7 +477,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             if (length != sizeof(RID)) {
                 moveRecords(page, slotDir.offset + sizeof(RID), freeBegin, sizeof(RID) - length);
                 short numSlots = getNumSlots(page);
-                updateSlotDirOffsets(page, rid.slotNum + 1, numSlots, sizeof(RID)-length);
+                updateSlotDirOffsets(page, slotDir.offset, numSlots, sizeof(RID)-length);
                 setFreeBegin(freeBegin -length + sizeof(RID), page);
             }
 
@@ -651,21 +662,22 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             break;
         }
     }
-    int conditionDataLength = recordDescriptor[i].length;
+    int conditionDataLength;
     int nullIndSize = ceil(((double)attributeNames.size())/8);
     char nullInd;
-    void* conditionData = malloc(conditionDataLength);
+    void* conditionData;
 
     if (compOp != 6) {
         if (i == recordDescriptor.size()) {
             delete[] record;
             return -1;
         }
-        
+        conditionDataLength = recordDescriptor[i].length;
         if(recordDescriptor[i].type == 2){
             conditionDataLength += 4;
         }
         conditionDataLength += recordDescriptor[i].length;
+        conditionData = malloc(conditionDataLength);
         memset(conditionData, 0, conditionDataLength);
         rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
         memcpy(&nullInd, (char*)conditionData, 1);
@@ -1121,7 +1133,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         //record2data((void*)record, recordDescriptor, data);
         //rbfm->printRecord(recordDescriptor, data);
         delete[] record;
-        free(conditionData);
         return SUCCESS;
     } else{
         delete[] record;
