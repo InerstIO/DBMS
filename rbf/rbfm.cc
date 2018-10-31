@@ -302,11 +302,11 @@ void RecordBasedFileManager::setSlotDir(void* page, unsigned slotNum, SlotDir sl
     return;
 }
 
-void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned start, short numSlots, short delta) {
-    for(int i = start; i <= numSlots; i++)
+void RecordBasedFileManager::updateSlotDirOffsets(void* page, unsigned afterOffset, short numSlots, short delta) {
+    for(int i = 1; i <= numSlots; i++)
     {
         SlotDir slotDir = getSlotDir(i, page);
-        if (slotDir.offset == USHRT_MAX) {
+        if (slotDir.offset == USHRT_MAX || slotDir.offset <= afterOffset) {
             continue;
         }
         slotDir.offset += delta;
@@ -352,9 +352,10 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
     short freeBegin = getFreeBegin(page);
     moveRecords(page, slotDir.offset, freeBegin, -recordLength);
+    unsigned short deletedOffset = slotDir.offset;
     slotDir.offset = USHRT_MAX;
     setSlotDir(page, rid.slotNum, slotDir);
-    updateSlotDirOffsets(page, rid.slotNum+1, numSlots, -recordLength);
+    updateSlotDirOffsets(page, deletedOffset, numSlots, -recordLength);
     
     setFreeBegin(freeBegin-recordLength, page);
     // do not update numSlots because we need that unchanged to find insertion position.
@@ -411,10 +412,20 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         }
         SlotDir realSlotDir = getSlotDir(realRid.slotNum, realPage);
         if (freeSpace(realPage) + realSlotDir.length >= newLength) {
-            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            rc = updateRecord(fileHandle, recordDescriptor, data, realRid);
+            free(page);
+            delete[] record;
+            free(realPage);
+            return rc;
         }
         else {
-            updateRecord(fileHandle, recordDescriptor, data, realRid);
+            rc = updateRecord(fileHandle, recordDescriptor, data, realRid);
+            if (rc) {
+                free(page);
+                delete[] record;
+                free(realPage);
+                return rc;
+            }
             RID newRid;
             getRecord(&newRid, realSlotDir, realPage);
             deleteRecord(fileHandle, recordDescriptor, realRid);
@@ -436,7 +447,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             moveRecords(page, slotDir.offset + newLength, freeBegin, newLength - length);
             setFreeBegin(freeBegin - length + newLength, page);
             short numSlots = getNumSlots(page);
-            updateSlotDirOffsets(page, rid.slotNum+1, numSlots, newLength-length);
+            updateSlotDirOffsets(page, slotDir.offset, numSlots, newLength-length);
             setRecord(page, record, slotDir);
         }
         else {
@@ -466,7 +477,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             if (length != sizeof(RID)) {
                 moveRecords(page, slotDir.offset + sizeof(RID), freeBegin, sizeof(RID) - length);
                 short numSlots = getNumSlots(page);
-                updateSlotDirOffsets(page, rid.slotNum + 1, numSlots, sizeof(RID)-length);
+                updateSlotDirOffsets(page, slotDir.offset, numSlots, sizeof(RID)-length);
                 setFreeBegin(freeBegin -length + sizeof(RID), page);
             }
 
@@ -512,18 +523,20 @@ RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned 
     unsigned i;
     short base = sizeof(short)*recordDescriptor.size()+4-1;
     short startAddr = sizeof(short)*recordDescriptor.size()+4;
-    short endAddr = startAddr;
+    short endAddr = startAddr-1;
     bool isNull = false;
     for(i = 0; i < recordDescriptor.size(); i++)
     {
         short pointer;
         memcpy(&pointer, (char*)record+i*sizeof(short)+4, sizeof(short));
+                //cout<<pointer<<", ";
         if (recordDescriptor[i].name == attributeName) {
             if(pointer == -1){
                 isNull = true;
             } else{
                 startAddr = endAddr+1;
                 endAddr = pointer+base;
+               // cout<<startAddr<<"--"<<base<<"+"<<pointer<<endl;
             }
             break;
         } else{
@@ -533,7 +546,7 @@ RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned 
             }
         }
     }
-    
+    //cout<<endl;
     if (i == recordDescriptor.size()) {
         return -1;
     }
@@ -546,7 +559,8 @@ RC RecordBasedFileManager::readAttributeFromRecord(const void* record, unsigned 
     }
     ((char*)data)[0] = nullIndicator;
     if(recordDescriptor[i].type == 2){
-        length = endAddr-startAddr;
+        length = endAddr-startAddr+1;
+        //cout<<length<<endl;
         memcpy((char*)data+1, &length, sizeof(int));
         memcpy((char*)data+5, (char*)record+startAddr, length);
     } else{
@@ -634,16 +648,7 @@ RC RecordBasedFileManager::concatData(const void* record, const vector<Attribute
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     SlotDir slotDir;
-    do
-    {
-        if(getNextRid(rid) == RBFM_EOF){
-            return RBFM_EOF;
-        }
-        fileHandle->readPage(rid.pageNum, loadedPage);
-        slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
-    } while (slotDir.tombstone || slotDir.offset == USHRT_MAX);
-    char *record = new char[slotDir.length];
-    rbfm->getRecord(record, slotDir, loadedPage);
+
     unsigned i;
     for(i = 0; i < recordDescriptor.size(); i++)
     {
@@ -651,484 +656,507 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             break;
         }
     }
-    int conditionDataLength = recordDescriptor[i].length;
+    int conditionDataLength;
     int nullIndSize = ceil(((double)attributeNames.size())/8);
     char nullInd;
-    void* conditionData = malloc(conditionDataLength);
+    void* conditionData;
 
-    if (compOp != 6) {
-        if (i == recordDescriptor.size()) {
-            delete[] record;
-            return -1;
-        }
+    
+    while(true){
+        do
+        {
+            if(getNextRid(rid) == RBFM_EOF){
+                return RBFM_EOF;
+            }
+            slotDir = rbfm->getSlotDir(rid.slotNum, loadedPage);
+        } while (slotDir.tombstone || slotDir.offset == USHRT_MAX);
+        char *record = new char[slotDir.length];
+        rbfm->getRecord(record, slotDir, loadedPage);
         
-        if(recordDescriptor[i].type == 2){
-            conditionDataLength += 4;
-        }
-        conditionDataLength += recordDescriptor[i].length;
-        memset(conditionData, 0, conditionDataLength);
-        rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
-        memcpy(&nullInd, (char*)conditionData, 1);
-    }
 
-    if(compOp==CompOp::EQ_OP){
-        if(recordDescriptor[i].type==0){
-            int val;
-            if(nullInd == 0){
+        if (compOp != 6) {
+            if (i == recordDescriptor.size()) {
                 delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val == *(int*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
+                return -1;
             }
-        } else if(recordDescriptor[i].type==1){
-            float val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val == *(float*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
+            conditionDataLength = recordDescriptor[i].length;
+            if(recordDescriptor[i].type == 2){
+                conditionDataLength += 4;
             }
-        } else if(recordDescriptor[i].type==2){
-            string val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                int length;
-                memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val == *(string*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else{
-            return -1;
+            conditionDataLength += recordDescriptor[i].length;
+            conditionData = malloc(conditionDataLength);
+            memset(conditionData, 0, conditionDataLength);
+            rbfm->readAttributeFromRecord(record, slotDir.length, recordDescriptor, conditionAttribute, conditionData);
+            //vector<Attribute> vec;
+            //vec.push_back(recordDescriptor[i]);
+            //void* td = malloc(200);
+            //record2data(record,recordDescriptor,td);
+            //rbfm->printRecord(vec, conditionData);
+            memcpy(&nullInd, (char*)conditionData, 1);
         }
-    } else if(compOp==CompOp::LT_OP){
-        if(recordDescriptor[i].type==0){
-            int val;
-            if(nullInd == 0){
+
+        if(compOp==CompOp::EQ_OP){
+            if(recordDescriptor[i].type==0){
+                int val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val == *(int*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==1){
+                float val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val == *(float*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==2){
+                string val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    int length;
+                    memcpy(&length, (char*)conditionData+1, 4);
+                    val.resize(length);
+                    memcpy((char*)val.data(), (char*)conditionData+5, length);
+                    string valueStr;
+                    int valueLength;
+                    memcpy(&valueLength, (char*)value, sizeof(int));
+                    valueStr.resize(valueLength);
+                    memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                    if(val == valueStr){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else{
+                return -1;
+            }
+        } else if(compOp==CompOp::LT_OP){
+            if(recordDescriptor[i].type==0){
+                int val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val < *(int*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==1){
+                float val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val < *(float*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==2){
+                string val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    int length;
+                    memcpy(&length, (char*)conditionData+1, 4);
+                    val.resize(length);
+                    memcpy((char*)val.data(), (char*)conditionData+5, length);
+                    string valueStr;
+                    int valueLength;
+                    memcpy(&valueLength, (char*)value, sizeof(int));
+                    valueStr.resize(valueLength);
+                    memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                    if(val < valueStr){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else{
                 delete[] record;
                 free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val < *(int*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
+                return -1;
             }
-        } else if(recordDescriptor[i].type==1){
-            float val;
-            if(nullInd == 0){
+        } else if(compOp==CompOp::LE_OP){
+            if(recordDescriptor[i].type==0){
+                int val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val <= *(int*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==1){
+                float val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val <= *(float*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==2){
+                string val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    int length;
+                    memcpy(&length, (char*)conditionData+1, 4);
+                    val.resize(length);
+                    memcpy((char*)val.data(), (char*)conditionData+5, length);
+                    string valueStr;
+                    int valueLength;
+                    memcpy(&valueLength, (char*)value, sizeof(int));
+                    valueStr.resize(valueLength);
+                    memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                    if(val <= valueStr){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else{
                 delete[] record;
                 free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val < *(float*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
+                return -1;
             }
-        } else if(recordDescriptor[i].type==2){
-            string val;
-            if(nullInd == 0){
+        } else if(compOp==CompOp::GT_OP){
+            if(recordDescriptor[i].type==0){
+                int val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val > *(int*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==1){
+                float val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val > *(float*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==2){
+                string val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    int length;
+                    memcpy(&length, (char*)conditionData+1, 4);
+                    val.resize(length);
+                    memcpy((char*)val.data(), (char*)conditionData+5, length);
+                    string valueStr;
+                    int valueLength;
+                    memcpy(&valueLength, (char*)value, sizeof(int));
+                    valueStr.resize(valueLength);
+                    memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                    if(val > valueStr){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else{
                 delete[] record;
                 free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                int length;
-                memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val < *(string*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
+                return -1;
             }
+        } else if(compOp==CompOp::GE_OP){
+            if(recordDescriptor[i].type==0){
+                int val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val >= *(int*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==1){
+                float val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val >= *(float*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==2){
+                string val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    int length;
+                    memcpy(&length, (char*)conditionData+1, 4);
+                    val.resize(length);
+                    memcpy((char*)val.data(), (char*)conditionData+5, length);
+                    string valueStr;
+                    int valueLength;
+                    memcpy(&valueLength, (char*)value, sizeof(int));
+                    valueStr.resize(valueLength);
+                    memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                    if(val >= valueStr){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else{
+                delete[] record;
+                free(conditionData);
+                return -1;
+            }
+        } else if(compOp==CompOp::NE_OP){
+            if(recordDescriptor[i].type==0){
+                int val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val != *(int*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==1){
+                float val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    memcpy(&val, (char*)conditionData+1, 4);
+                    if(val != *(float*)(value)){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            } else if(recordDescriptor[i].type==2){
+                string val;
+                if(nullInd != 0){
+                    continue;
+                } else{
+                    int length;
+                    memcpy(&length, (char*)conditionData+1, 4);
+                    val.resize(length);
+                    memcpy((char*)val.data(), (char*)conditionData+5, length);
+                    string valueStr;
+                    int valueLength;
+                    memcpy(&valueLength, (char*)value, sizeof(int));
+                    valueStr.resize(valueLength);
+                    memcpy((char*)valueStr.data(), (char*)value+4, valueLength);
+                    if(val != valueStr){
+                        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+                        if(rc != SUCCESS){
+                            delete[] record;
+                            free(conditionData);
+                            return rc;
+                        }
+                        delete[] record;
+                        free(conditionData);
+                        return 0;
+                    } else{
+                        continue;
+                    }
+                }
+            }else{
+                delete[] record;
+                free(conditionData);
+                return -1;
+            }
+        } else if(compOp == CompOp::NO_OP){
+            RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
+            if(rc != SUCCESS){
+                delete[] record;
+                free(conditionData);
+                return rc;
+            }
+            //record2data((void*)record, recordDescriptor, data);
+            //rbfm->printRecord(recordDescriptor, data);
+            delete[] record;
+            return SUCCESS;
         } else{
             delete[] record;
             free(conditionData);
             return -1;
         }
-    } else if(compOp==CompOp::LE_OP){
-        if(recordDescriptor[i].type==0){
-            int val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val <= *(int*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==1){
-            float val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val <= *(float*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==2){
-            string val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                int length;
-                memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val <= *(string*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else{
-            delete[] record;
-            free(conditionData);
-            return -1;
-        }
-    } else if(compOp==CompOp::GT_OP){
-        if(recordDescriptor[i].type==0){
-            int val;
-            if(nullInd != 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val > *(int*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==1){
-            float val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val > *(float*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==2){
-            string val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                int length;
-                memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val > *(string*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else{
-            delete[] record;
-            free(conditionData);
-            return -1;
-        }
-    } else if(compOp==CompOp::GE_OP){
-        if(recordDescriptor[i].type==0){
-            int val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val >= *(int*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==1){
-            float val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val >= *(float*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==2){
-            string val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                int length;
-                memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val >= *(string*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else{
-            delete[] record;
-            free(conditionData);
-            return -1;
-        }
-    } else if(compOp==CompOp::NE_OP){
-        if(recordDescriptor[i].type==0){
-            int val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val != *(int*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==1){
-            float val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                memcpy(&val, (char*)conditionData+1, 4);
-                if(val != *(float*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        } else if(recordDescriptor[i].type==2){
-            string val;
-            if(nullInd == 0){
-                delete[] record;
-                free(conditionData);
-                return getNextRecord(rid, data);
-            } else{
-                int length;
-                memcpy(&length, (char*)conditionData+1, 4);
-                memcpy(&val, (char*)conditionData+5, length);
-                if(val != *(string*)(value)){
-                    RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-                    if(rc != SUCCESS){
-                        return rc;
-                    }
-                    delete[] record;
-                    free(conditionData);
-                    return 0;
-                } else{
-                    delete[] record;
-                    free(conditionData);
-                    return getNextRecord(rid, data);
-                }
-            }
-        }else{
-            delete[] record;
-            free(conditionData);
-            return -1;
-        }
-    } else if(compOp == CompOp::NO_OP){
-        RC rc = rbfm->concatData(record, recordDescriptor, attributeNames, data);
-        if(rc != SUCCESS){
-            return rc;
-        }
-        //record2data((void*)record, recordDescriptor, data);
-        //rbfm->printRecord(recordDescriptor, data);
         delete[] record;
-        free(conditionData);
-        return SUCCESS;
-    } else{
-        delete[] record;
-        free(conditionData);
-        return -1;
     }
-    delete[] record;
+    
+
     free(conditionData);
     return 0;
 }

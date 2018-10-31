@@ -1,36 +1,97 @@
 1. Basic information
-Team number (e.g., 01) : 
-#1 Student ID : 
-#1 Student Name : 
-#2 Student ID : 
-#2 Student Name : 
-OS (bit) :
-gcc version :
+Team number (e.g., 01) : 23
+#1 Student ID : 20689831
+#1 Student Name : Yuxuan Hao
+#2 Student ID : 25245625
+#2 Student Name : Yu Feng
+OS (bit) : Ubuntu 16.04.3 x64
+gcc version : 5.4.0 20160609
 
 
 2. Meta-data
 - Show your meta-data design (Tables and Columns table) and information about each column.
-
+There are two tables that store all the table information.
+The first one is called Tables. We name both table and filename for this table as Tables. There are three fields in this table, which are table-id(int), table-name(varchar(50)), and file-name(varchar(50)).
+And in Columns, we have the following fields: table-id(int), column-name(varchar(50)), column-type(int), column-length(int), and column-position(int)
 
 3. Internal Record Format
 - Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that your team hasn't implemented this feature.
+We use the following format to store the records:
+---------------------------------------------
+|num|pointer1|pointer2|...|value1|value2|...|
+---------------------------------------------
+Num stores how many fields are in this record. We store it as an integer, which means it occupies 4 bytes.
+We use 2 bytes to store each pointer. Since there are 16 digits in 2 bytes, and 2^16>4096, we can use 0xffff value to represent null without worries. If a pointer is not null, it will point to the location at the end of the value it points to. If a field is null, it will not occupy any space in value part.
+To read a field, we can find its pointer in O(1) time since we can know the rank of the field according to recordDescriptor. If the value of pointer is 0xffff, we return a null directly. Otherwise, if it is not the first field, assuming it is the kth field, we can return the data locates between pointers(k-1) to pointers(k). This costs O(1) time. If we need to read the first field, we return the data between num*2 to first pointer. It is still O(1) time. Therefore, we achieve O(1) read time complexity by using this format. 
+
 - Describe how you store a VarChar field.
+|length(int)|value
 - Describe how you deal with an update and delete.
 
 
 4. Page Format
 - Show your page format design.
 - Describe how you deal with an update and delete.
+----------------------------------------------
+record1|record2|...|realRid|...|recordN|
+.
+free space
+.
+      |SlotDirN|...|Tombstone|...|SlotDir1|N|F
+----------------------------------------------
+Page format design:
+Records are appended to the free space offset in the page (in the top part of the page) until there is not enough free space left in that page.
+The last byte of the page is used to store the the offset of free space, so that new records can be appended at that offset, let's call it F.
+The byte before the last byte is used to store the number of records in that page, let's call it N.
+Before that byte, there are N slot directories indicating the offset, length and tombstone of the records so that we can get the position of the record in O(1) time.
+By using F and N, we can easily get the amount of free space in that page = PAGE_SIZE - 2 * sizeof(int) - N * sizeof(SlotDir) - F.
 
+Update:
+if rid does not point to a tombstone:
+    if newRecord has the same length as old one:
+        update record directly
+    elif current page has enough free space for newRecord:
+        1. move the records after the record we want to update to the right
+        2. update the freeSpace on that page
+        3. update the offset in the SlotDirs of the records that has been moved
+        4. update record
+    else (current page does not have enough free space for newRecord):
+        1. find a new position (rid)
+        2. update old record to rid
+        3. update slotDir.length & tombstone & set slotDir
+        4. move records forward if length different
+        5. update slotDir offsets if length different
+        6. update freeBegin if length different
+        7. insert in new position
+else (we want to update a tombstone):
+    get realRid
+    if realRid.pageNum has enough freeSpace:
+        updateRecord(..., realRid) [recursive call this function]
+    else:
+        1. updateRecord(..., realRid) [recursive call this function]
+        2. get tombstone record(newRid) on realPage
+        3. delete the tombstone record in realPage
+        4. set the tombstone record in current page to newRid
+
+Delete:
+if we want to delete a rid pointed to a tombstone:
+    get realRid
+    deleteRecord(..., realRid) [recursive call this function]
+move the records after the record we want to delete to the left
+update the slotDir to indicate that the record has been deleted
+update the offset in the SlotDirs of the records that has been moved
+update the freeSpace on that page
 
 5. File Format
 - Show your file format design
-
+In our file system, we have two files called Tables and Columns to store the information of all the tables. The information of these two files are introduced in the metadata part. 
+When creating a tbale, we firstly scan Tables to get all the existing table ids, and assign the smallest missing possitive number as the target id for the new table. Then, we insert the information of the new table to Tables, and information of all its columns to Columns. In the end, we create the new table file.
+When deleting a table, we firstly scan Tables to find the table id for the victim table, and delete the table in Tables. Then we delete all its column information in Columns according to this table id. In the end, we delete the victim table file.
 
 
 6. Implementation Detail
 - Other implementation details goes here.
-
+getNextRecord is implemented in a iterative way instead of recursive way since we might have stack overflow when using recursion.
 
 7. Other (optional)
 - Freely use this section to tell us about things that are related to the project 2, but not related to the other sections (optional)
