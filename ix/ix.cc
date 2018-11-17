@@ -92,7 +92,10 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 
 RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
-    return -1;
+    void* retKey;
+    int retPageId1;
+    int retPageId2;
+    return insertEntryHelper(attribute, ixfileHandle, key, rid, ixfileHandle.rootNodePointer, retPageId1, retKey, retPageId2);
 }
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
@@ -120,6 +123,40 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
     if(ixfileHandle.rootNodePointer == 0){
         int newPageId;
         RC rc = createNewPage(true, ixfileHandle, newPageId);
+        if(rc != SUCCESS) return rc;
+        rc = insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
+        if(rc != SUCCESS) return rc;
+        ixfileHandle.rootNodePointer = newPageId;
+    } else{
+        void* page = malloc(PAGE_SIZE);
+        ixfileHandle.fileHandle.readPage(curPageId-1, page);
+        bool isLeaf;
+        memcpy((char*)(&isLeaf), (char*)page, sizeof(bool));
+        if(isLeaf){
+            if(attribute.type == 0){
+                int insertSize = sizeof(int)+2*sizeof(unsigned);
+                int space;
+                memcpy((char*)(&space), (char*)page+1, sizeof(int));
+                if(space+insertSize <= PAGE_SIZE){
+                    insertLeaf(ixfileHandle, curPageId, attribute, key, rid);
+                } else{
+                    int newPageId;
+                    void* pushupKey = malloc(sizeof(int));
+                    RID pushupRid;
+                    splitLeafPage(ixfileHandle, curPageId, newPageId, pushupKey, pushupRid, attribute);
+                    bool isSmall;
+                    RC rc = keyCompare(isSmall, attribute, key, pushupKey, rid, pushupRid);
+                    if(isSmall){
+                        insertLeaf(ixfileHandle, curPageId, attribute, key, rid);
+                    } else{
+                        insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
+                    }
+                    free(pushupKey);
+                }
+            }
+        } else{
+            
+        }
     }
     return SUCCESS;
 }
@@ -127,7 +164,7 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
 RC IndexManager::createNewPage(bool isLeaf, IXFileHandle &ixfileHandle, int &newPageId){
     char* newPage = (char*)malloc(PAGE_SIZE);
     ixfileHandle.fileHandle.appendPage(newPage);
-    newPageId = ixfileHandle.fileHandle.appendPageCounter+1;
+    newPageId = ixfileHandle.fileHandle.appendPageCounter;
     free(newPage);
     return SUCCESS;
 }
