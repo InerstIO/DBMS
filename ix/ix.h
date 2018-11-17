@@ -52,6 +52,14 @@ class IndexManager {
 
     private:
         static IndexManager *_index_manager;
+        RC insertEntryHelper(const Attribute &attribute, IXFileHandle &ixfileHandle, const void* key, const RID &rid, int curPageId, 
+            int &retPageId1, void* retKey, int &retPageId2);
+        RC createNewPage(bool isLeaf, IXFileHandle &ixfileHandle, int &newPageId);
+        RC keyCompare(bool &res, const Attribute &attribute, const void* key1, const void* key2, const RID &rid1, const RID &rid2);
+        RC insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attribute &attribute, const void* key, const RID &rid);
+        RC insertInternalNode(IXFileHandle& ixfileHandle, int pageId, const Attribute &attribute, const void* key, const RID &rid, int page1, int page2);
+        //input page to split, return newpageid, push-up key, push-up rid
+        RC splitLeafPage(IXFileHandle& ixfileHandle, int pageId1, int &newPageId, void* key, RID& rid, const Attribute &attribute);
 };
 
 
@@ -80,6 +88,8 @@ class IXFileHandle {
     unsigned ixReadPageCounter;
     unsigned ixWritePageCounter;
     unsigned ixAppendPageCounter;
+    FileHandle fileHandle;
+    unsigned rootNodePointer;
 
     // Constructor
     IXFileHandle();
@@ -89,6 +99,8 @@ class IXFileHandle {
 
 	// Put the current counter values of associated PF FileHandles into variables
 	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
+
+    RC getRootNodePointer(unsigned &rootNodePointer);
 
 };
 
