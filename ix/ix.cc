@@ -372,6 +372,8 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
 
 RC IndexManager::createNewPage(bool isLeaf, IXFileHandle &ixfileHandle, int &newPageId){
     char* newPage = (char*)malloc(PAGE_SIZE);
+    memset(newPage, 0, PAGE_SIZE);
+    memcpy(newPage, &isLeaf, sizeof(bool));
     ixfileHandle.fileHandle.appendPage(newPage);
     newPageId = ixfileHandle.fileHandle.appendPageCounter;
     free(newPage);
