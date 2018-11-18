@@ -381,13 +381,18 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
             }
         }
     }
-    cout<<curPageId<<", "<<retPageId1<<", "<<retPageId2<<endl;
     if(retPageId1>0 && retPageId2>0){
         cout<<curPageId<<", "<<retPageId1<<", "<<retPageId2<<endl;
-        int newRootPageId = 0;
-        createNewPage(false, ixfileHandle, newRootPageId);
-        ixfileHandle.rootNodePointer = newRootPageId;
-        insertInternalNode(ixfileHandle, newRootPageId, attribute, retKey, retRid, retPageId1, retPageId2);
+        bool isRootLeaf;
+        void* rootPage = malloc(PAGE_SIZE);
+        ixfileHandle.fileHandle.readPage(ixfileHandle.rootNodePointer-1, rootPage);
+        memcpy(&isRootLeaf, (char*)rootPage, sizeof(bool));
+        if(isRootLeaf){
+            int newRootPageId = 0;
+            createNewPage(false, ixfileHandle, newRootPageId);
+            ixfileHandle.rootNodePointer = newRootPageId;
+            insertInternalNode(ixfileHandle, newRootPageId, attribute, retKey, retRid, retPageId1, retPageId2);
+        }
     }
     return SUCCESS;
 }
