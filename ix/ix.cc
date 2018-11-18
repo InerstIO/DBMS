@@ -374,6 +374,15 @@ RC IndexManager::createNewPage(bool isLeaf, IXFileHandle &ixfileHandle, int &new
     char* newPage = (char*)malloc(PAGE_SIZE);
     memset(newPage, 0, PAGE_SIZE);
     memcpy(newPage, &isLeaf, sizeof(bool));
+    int size;
+    if(isLeaf){
+        size = 2*sizeof(int)+sizeof(bool);
+    } else{
+        size = sizeof(int)+sizeof(bool);
+    }
+    memcpy(newPage+1, &size, sizeof(int));
+    int nextPtr = 0;
+    memcpy(newPage+5, &nextPtr, sizeof(int));
     ixfileHandle.fileHandle.appendPage(newPage);
     newPageId = ixfileHandle.fileHandle.appendPageCounter;
     free(newPage);
@@ -511,16 +520,16 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
 
 RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attribute &attribute, const void* key, const RID &rid){
     if(attribute.type == 0){
-        cout<<"pageid: "<<pageId<<endl;
+        //cout<<"pageid: "<<pageId<<endl;
         void* page = malloc(PAGE_SIZE);
         ixfileHandle.fileHandle.readPage(pageId-1, page);
         void* newPage = malloc(PAGE_SIZE);
         int space;
         memcpy(&space, (char*)page+1, sizeof(int));
-        cout<<space<<endl;
-        int offset = 5;
+        //cout<<space<<endl;
+        int offset = 9;
         int newOffset = offset;
-        memcpy((char*)(newPage), (char*)page, sizeof(int)+sizeof(bool));
+        memcpy((char*)(newPage), (char*)page, 2*sizeof(int)+sizeof(bool));
         bool hasInserted = false;
         while(offset < space){
             int k;
@@ -558,7 +567,9 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
         int itemSize = sizeof(int)+2*sizeof(unsigned);
         space += itemSize;
         memcpy((char*)newPage+1, (char*)(&space), sizeof(int));
-        cout<<"space: "<<space<<", pageid: "<<pageId<<endl;
+        int nextpage;
+        memcpy((char*)(&nextpage), newPage+5, sizeof(int));
+        cout<<"space: "<<space<<", pageid: "<<pageId<<"nextpage: "<<nextpage<<endl;
         ixfileHandle.fileHandle.writePage(pageId-1, newPage);
         free(page);
         free(newPage);
@@ -578,9 +589,9 @@ RC IndexManager::splitLeafPage(IXFileHandle& ixfileHandle, int pageId, int &newP
     memset(splitedPage, 0, PAGE_SIZE);
     ixfileHandle.fileHandle.readPage(pageId-1, page);
     if(attribute.type == 0){
-        int offset = 5;
-        int splitOffset = 5;
-        int newOffset = 5;
+        int offset = 9;
+        int splitOffset = 9;
+        int newOffset = 9;
         memcpy((char*)newPage, (char*)page, sizeof(bool)+sizeof(int));
         memcpy((char*)splitedPage, (char*)page, sizeof(bool)+sizeof(int));
         int itemSize = sizeof(int)+2*sizeof(unsigned);
@@ -599,6 +610,8 @@ RC IndexManager::splitLeafPage(IXFileHandle& ixfileHandle, int pageId, int &newP
         }
         memcpy((char*)newPage+1, (char*)(&newOffset), sizeof(int));
         memcpy((char*)splitedPage+1, (char*)(&splitOffset), sizeof(int));
+        int nextPagePtr = ixfileHandle.fileHandle.appendPageCounter+1;
+        memcpy((char*)newPage+5, &nextPagePtr, sizeof(int));
         ixfileHandle.fileHandle.writePage(pageId-1, splitedPage);
         ixfileHandle.fileHandle.appendPage(newPage);
         newPageId = ixfileHandle.fileHandle.appendPageCounter;
