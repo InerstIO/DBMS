@@ -129,7 +129,7 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 }
 
 void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribute, unsigned pageId, int depth, bool last) const {
-    void* page = malloc(PAGE_SIZE); //TODO: free
+    void* page = malloc(PAGE_SIZE);
     int type = attribute.type;
     ixfileHandle.fileHandle.readPage(pageId - 1, page); //-1????????????????
     bool isLeaf;
@@ -314,6 +314,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
         }
         cout << endl;
     }
+    free(page);
 }
 
 void IndexManager::printTabs(int num) const {
