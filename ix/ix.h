@@ -54,7 +54,7 @@ class IndexManager {
     private:
         static IndexManager *_index_manager;
         RC insertEntryHelper(const Attribute &attribute, IXFileHandle &ixfileHandle, const void* key, const RID &rid, int curPageId, 
-            int &retPageId1, void* retKey, int &retPageId2);
+            int &retPageId1, void* retKey, RID &retRid, int &retPageId2);
         RC createNewPage(bool isLeaf, IXFileHandle &ixfileHandle, int &newPageId);
         RC keyCompare(bool &res, const Attribute &attribute, const void* key1, const void* key2, const RID &rid1, const RID &rid2);
         RC insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attribute &attribute, const void* key, const RID &rid);

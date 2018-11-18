@@ -95,9 +95,9 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
     void* retKey;
-    int retPageId1;
-    int retPageId2;
-    cout<<"rootNodePointer: "<<ixfileHandle.rootNodePointer<<endl;
+    int retPageId1=0;
+    int retPageId2=0;
+    //cout<<"rootNodePointer: "<<ixfileHandle.rootNodePointer<<endl;
     RID retRid;
     return insertEntryHelper(attribute, ixfileHandle, key, rid, ixfileHandle.rootNodePointer, retPageId1, retKey, retRid, retPageId2);
 }
@@ -329,8 +329,10 @@ void IndexManager::printTabs(int num) const {
 
 RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixfileHandle, const void* key, const RID &rid, int curPageId, 
             int &retPageId1, void* retKey, RID &retRid, int &retPageId2){
+    //cout<<"insert entry: "<<curPageId<<endl;
     if(ixfileHandle.rootNodePointer == 0){
         int newPageId;
+        cout<<"line334"<<endl;
         RC rc = createNewPage(true, ixfileHandle, newPageId);
         ixfileHandle.rootNodePointer = newPageId;
         if(rc != SUCCESS) return rc;
@@ -369,13 +371,19 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                     retRid = pushupRid;
                     retPageId1 = curPageId;
                     retPageId2 = newPageId;
+                    cout<<"retpages: "<<retPageId1<<", "<<retPageId2<<endl;
                 }
             }
         } else{
-            
+            if(attribute.type == 0){
+                //find pageid for next layer
+
+            }
         }
     }
-    if(curPageId==0){
+    cout<<curPageId<<", "<<retPageId1<<", "<<retPageId2<<endl;
+    if(retPageId1>0 && retPageId2>0){
+        cout<<curPageId<<", "<<retPageId1<<", "<<retPageId2<<endl;
         int newRootPageId = 0;
         createNewPage(false, ixfileHandle, newRootPageId);
         ixfileHandle.rootNodePointer = newRootPageId;
@@ -399,6 +407,7 @@ RC IndexManager::createNewPage(bool isLeaf, IXFileHandle &ixfileHandle, int &new
     memcpy(newPage+5, &nextPtr, sizeof(int));
     ixfileHandle.fileHandle.appendPage(newPage);
     newPageId = ixfileHandle.fileHandle.appendPageCounter;
+    cout<<"newpageid: "<<newPageId<<endl;
     free(newPage);
     return SUCCESS;
 }
@@ -583,7 +592,7 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
         memcpy((char*)newPage+1, (char*)(&space), sizeof(int));
         int nextpage;
         memcpy((char*)(&nextpage), newPage+5, sizeof(int));
-        cout<<"space: "<<space<<", pageid: "<<pageId<<"nextpage: "<<nextpage<<endl;
+        //cout<<"space: "<<space<<", pageid: "<<pageId<<"nextpage: "<<nextpage<<endl;
         ixfileHandle.fileHandle.writePage(pageId-1, newPage);
         free(page);
         free(newPage);
