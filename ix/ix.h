@@ -92,6 +92,9 @@ class IX_ScanIterator {
         void* loadedPage;
         int offset;
         int space;
+    private:
+        // return true if key1 smaller (or equal, depends on inclusive) than key2
+        RC compare(bool isSmaller, const int type, const void* key1, const void* key2, const bool inclusive);
 };
 
 
