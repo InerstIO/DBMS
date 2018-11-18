@@ -610,6 +610,9 @@ RC IndexManager::splitLeafPage(IXFileHandle& ixfileHandle, int pageId, int &newP
         }
         memcpy((char*)newPage+1, (char*)(&newOffset), sizeof(int));
         memcpy((char*)splitedPage+1, (char*)(&splitOffset), sizeof(int));
+        int originNextPtr = 0;
+        memcpy((char*)(&originNextPtr), (char*)newPage+5, sizeof(int));
+        memcpy((char*)splitedPage+5, &originNextPtr, sizeof(int));
         int nextPagePtr = ixfileHandle.fileHandle.appendPageCounter+1;
         memcpy((char*)newPage+5, &nextPagePtr, sizeof(int));
         ixfileHandle.fileHandle.writePage(pageId-1, splitedPage);
