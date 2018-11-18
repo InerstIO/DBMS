@@ -97,6 +97,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     void* retKey;
     int retPageId1;
     int retPageId2;
+    cout<<"rootNodePointer: "<<ixfileHandle.rootNodePointer<<endl;
     return insertEntryHelper(attribute, ixfileHandle, key, rid, ixfileHandle.rootNodePointer, retPageId1, retKey, retPageId2);
 }
 
@@ -119,8 +120,9 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
     unsigned int rootNodePointer;
-    RC rc = ixfileHandle.getRootNodePointer(rootNodePointer);
-    if (rc) {
+    rootNodePointer = ixfileHandle.rootNodePointer;
+    cout<<"rootNodePointer: "<<rootNodePointer<<endl;
+    if (rootNodePointer <= 0) {
         cout<<"Failed to get root node."<<endl;
     }
     //cout << "{" << endl;
@@ -329,6 +331,7 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
     if(ixfileHandle.rootNodePointer == 0){
         int newPageId;
         RC rc = createNewPage(true, ixfileHandle, newPageId);
+        ixfileHandle.rootNodePointer = newPageId;
         if(rc != SUCCESS) return rc;
         rc = insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
         if(rc != SUCCESS) return rc;
@@ -506,11 +509,13 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
 
 RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attribute &attribute, const void* key, const RID &rid){
     if(attribute.type == 0){
+        cout<<"pageid: "<<pageId<<endl;
         void* page = malloc(PAGE_SIZE);
         ixfileHandle.fileHandle.readPage(pageId-1, page);
         void* newPage = malloc(PAGE_SIZE);
         int space;
         memcpy(&space, (char*)page+1, sizeof(int));
+        cout<<space<<endl;
         int offset = 5;
         int newOffset = offset;
         memcpy((char*)(newPage), (char*)page, sizeof(int)+sizeof(bool));
@@ -548,6 +553,10 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
             newOffset += sizeof(unsigned);
             hasInserted = true;
         }
+        int itemSize = sizeof(int)+2*sizeof(unsigned);
+        space += itemSize;
+        memcpy((char*)newPage+1, (char*)(&space), sizeof(int));
+        cout<<"space: "<<space<<", pageid: "<<pageId<<endl;
         ixfileHandle.fileHandle.writePage(pageId-1, newPage);
         free(page);
         free(newPage);
