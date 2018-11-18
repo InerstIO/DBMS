@@ -82,6 +82,16 @@ class IX_ScanIterator {
 
         // Terminate index scan
         RC close();
+        
+        IXFileHandle* ixfileHandle;
+        int type;
+        const void *lowKey;
+        const void *highKey;
+        bool lowKeyInclusive;
+        bool highKeyInclusive;
+        void* loadedPage;
+        int offset;
+        int space;
 };
 
 
