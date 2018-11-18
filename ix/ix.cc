@@ -135,7 +135,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
     bool isLeaf;
     memcpy(&isLeaf, page, sizeof(bool));
     int space;
-    memcpy(&space, page+sizeof(bool), sizeof(int));
+    memcpy(&space, (char *)page+sizeof(bool), sizeof(int));
     int offset = sizeof(bool) + sizeof(int);
     vector<int> pageVector;
     unsigned childPageId;
@@ -151,16 +151,16 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             {
                 vector<int> keyVector;
                 while (offset < space - sizeof(int)) { //need to - sizeof(int) to handle the last pointer separately?????????
-                    memcpy(&childPageId, page+offset, sizeof(int));
+                    memcpy(&childPageId, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     pageVector.push_back(childPageId);
                     int k;
-                    memcpy(&k, page+offset, sizeof(int));
+                    memcpy(&k, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     keyVector.push_back(k);
                     offset += sizeof(RID);
                 }
-                memcpy(&childPageId, page+offset, sizeof(int));
+                memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
                 for (unsigned i=0; i<keyVector.size() - 1; i++) {
                     cout << "\"" << keyVector.at(i) << "\",";
@@ -172,16 +172,16 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             {
                 vector<float> keyVector;
                 while (offset < space - sizeof(float)) {
-                    memcpy(&childPageId, page+offset, sizeof(int));
+                    memcpy(&childPageId, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     pageVector.push_back(childPageId);
                     float k;
-                    memcpy(&k, page+offset, sizeof(float));
+                    memcpy(&k, (char *)page+offset, sizeof(float));
                     offset += sizeof(float);
                     keyVector.push_back(k);
                     offset += sizeof(RID);
                 }
-                memcpy(&childPageId, page+offset, sizeof(int));
+                memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
                 for (unsigned i=0; i<keyVector.size() - 1; i++) {
                     cout << "\"" << keyVector.at(i) << "\",";
@@ -223,10 +223,10 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 vector<int> keyVector;
                 while (offset < space - sizeof(int)) {//TODO: handle the pointer at the end
                     int k;
-                    memcpy(&k, page+offset, sizeof(int));
+                    memcpy(&k, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     keyVector.push_back(k);
-                    memcpy(&rid, page+offset, sizeof(RID));
+                    memcpy(&rid, (char *)page+offset, sizeof(RID));
                     offset += sizeof(RID);
                     RIDVector.push_back(rid);
                 }
@@ -244,10 +244,10 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 vector<float> keyVector;
                 while (offset < space - sizeof(int)) {//TODO: handle the pointer at the end
                     float k;
-                    memcpy(&k, page+offset, sizeof(float));
+                    memcpy(&k, (char *)page+offset, sizeof(float));
                     offset += sizeof(float);
                     keyVector.push_back(k);
-                    memcpy(&rid, page+offset, sizeof(RID));
+                    memcpy(&rid, (char *)page+offset, sizeof(RID));
                     offset += sizeof(RID);
                     RIDVector.push_back(rid);
                 }
