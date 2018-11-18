@@ -98,7 +98,8 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     int retPageId1;
     int retPageId2;
     cout<<"rootNodePointer: "<<ixfileHandle.rootNodePointer<<endl;
-    return insertEntryHelper(attribute, ixfileHandle, key, rid, ixfileHandle.rootNodePointer, retPageId1, retKey, retPageId2);
+    RID retRid;
+    return insertEntryHelper(attribute, ixfileHandle, key, rid, ixfileHandle.rootNodePointer, retPageId1, retKey, retRid, retPageId2);
 }
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
@@ -327,15 +328,16 @@ void IndexManager::printTabs(int num) const {
 }
 
 RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixfileHandle, const void* key, const RID &rid, int curPageId, 
-            int &retPageId1, void* retKey, int &retPageId2){
+            int &retPageId1, void* retKey, RID &retRid, int &retPageId2){
     if(ixfileHandle.rootNodePointer == 0){
         int newPageId;
         RC rc = createNewPage(true, ixfileHandle, newPageId);
         ixfileHandle.rootNodePointer = newPageId;
         if(rc != SUCCESS) return rc;
-        rc = insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
-        if(rc != SUCCESS) return rc;
+        //rc = insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
+        //if(rc != SUCCESS) return rc;
         ixfileHandle.rootNodePointer = newPageId;
+        insertEntryHelper(attribute, ixfileHandle, key, rid, newPageId, retPageId1, retKey, retRid, retPageId2);
     } else{
         void* page = malloc(PAGE_SIZE);
         ixfileHandle.fileHandle.readPage(curPageId-1, page);
@@ -356,16 +358,28 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                     bool isSmall;
                     RC rc = keyCompare(isSmall, attribute, key, pushupKey, rid, pushupRid);
                     if(isSmall){
+                        //insertEntryHelper(attribute, ixfileHandle, key, rid, curPageId, retPageId1, retKey, retRid, retPageId2);
                         insertLeaf(ixfileHandle, curPageId, attribute, key, rid);
                     } else{
+                        //insertEntryHelper(attribute, ixfileHandle, key, rid, newPageId, retPageId1, retKey, retRid, retPageId2);
                         insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
                     }
-                    free(pushupKey);
+
+                    retKey = pushupKey;
+                    retRid = pushupRid;
+                    retPageId1 = curPageId;
+                    retPageId2 = newPageId;
                 }
             }
         } else{
             
         }
+    }
+    if(curPageId==0){
+        int newRootPageId = 0;
+        createNewPage(false, ixfileHandle, newRootPageId);
+        ixfileHandle.rootNodePointer = newRootPageId;
+        insertInternalNode(ixfileHandle, newRootPageId, attribute, retKey, retRid, retPageId1, retPageId2);
     }
     return SUCCESS;
 }
