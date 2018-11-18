@@ -150,7 +150,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeInt:
             {
                 vector<int> keyVector;
-                while (offset < space - sizeof(int)) { //need to - sizeof(int) to handle the last pointer separately?????????
+                while (offset < space - (int)sizeof(int)) { //need to - sizeof(int) to handle the last pointer separately?????????
                     memcpy(&childPageId, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     pageVector.push_back(childPageId);
@@ -171,7 +171,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeReal:
             {
                 vector<float> keyVector;
-                while (offset < space - sizeof(float)) {
+                while (offset < space - (int)sizeof(int)) {
                     memcpy(&childPageId, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     pageVector.push_back(childPageId);
@@ -192,7 +192,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeVarChar:
             {
                 vector<char*> keyVector;
-                while (offset < space - sizeof(float)) {
+                while (offset < space - (int)sizeof(int)) {
                     memcpy(&childPageId, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     pageVector.push_back(childPageId);
@@ -242,7 +242,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeInt:
             {
                 vector<int> keyVector;
-                while (offset < space - sizeof(int)) {//TODO: handle the pointer at the end
+                while (offset < space - (int)sizeof(int)) {//TODO: handle the pointer at the end
                     int k;
                     memcpy(&k, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
@@ -263,7 +263,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeReal:
             {
                 vector<float> keyVector;
-                while (offset < space - sizeof(int)) {//TODO: handle the pointer at the end
+                while (offset < space - (int)sizeof(int)) {//TODO: handle the pointer at the end
                     float k;
                     memcpy(&k, (char *)page+offset, sizeof(float));
                     offset += sizeof(float);
@@ -284,7 +284,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeVarChar:
             {
                 vector<char*> keyVector;
-                while (offset < space - sizeof(int)) {//TODO: handle the pointer at the end
+                while (offset < space - (int)sizeof(int)) {//TODO: handle the pointer at the end
                     int length;
                     memcpy(&length, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
