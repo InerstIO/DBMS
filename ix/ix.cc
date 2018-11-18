@@ -1,5 +1,7 @@
 
 #include "ix.h"
+#include <stack>
+#include <vector>
 
 IndexManager* IndexManager::_index_manager = 0;
 
@@ -113,6 +115,170 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 }
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
+    unsigned int rootNodePointer;
+    RC rc = ixfileHandle.getRootNodePointer(rootNodePointer);
+    if (rc) {
+        cout<<"Failed to get root node."<<endl;
+    }
+    //cout << "{" << endl;
+    dfsPrint(ixfileHandle, attribute, rootNodePointer, 0, true);
+    //cout << "}" << endl;
+}
+
+void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribute, unsigned pageId, int depth, bool last) const {
+    void* page = malloc(PAGE_SIZE); //TODO: free
+    int type = attribute.type;
+    ixfileHandle.fileHandle.readPage(pageId - 1, page); //-1????????????????
+    bool isLeaf;
+    memcpy(&isLeaf, page, sizeof(bool));
+    int space;
+    memcpy(&space, page+sizeof(bool), sizeof(int));
+    int offset = sizeof(bool) + sizeof(int);
+    vector<int> pageVector;
+    unsigned childPageId;
+
+    printTabs(depth);
+    cout << "{\"keys\":[";
+
+    if (!isLeaf) {
+        
+        switch (type)
+        {
+            case TypeInt:
+            {
+                vector<int> keyVector;
+                while (offset < space - sizeof(int)) { //need to - sizeof(int) to handle the last pointer separately?????????
+                    memcpy(&childPageId, page+offset, sizeof(int));
+                    offset += sizeof(int);
+                    pageVector.push_back(childPageId);
+                    int k;
+                    memcpy(&k, page+offset, sizeof(int));
+                    offset += sizeof(int);
+                    keyVector.push_back(k);
+                    offset += sizeof(RID);
+                }
+                memcpy(&childPageId, page+offset, sizeof(int));
+                pageVector.push_back(childPageId);
+                for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                    cout << "\"" << keyVector.at(i) << "\",";
+                }
+                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
+                break;
+            }
+            case TypeReal:
+            {
+                vector<float> keyVector;
+                while (offset < space - sizeof(float)) {
+                    memcpy(&childPageId, page+offset, sizeof(int));
+                    offset += sizeof(int);
+                    pageVector.push_back(childPageId);
+                    float k;
+                    memcpy(&k, page+offset, sizeof(float));
+                    offset += sizeof(float);
+                    keyVector.push_back(k);
+                    offset += sizeof(RID);
+                }
+                memcpy(&childPageId, page+offset, sizeof(int));
+                pageVector.push_back(childPageId);
+                for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                    cout << "\"" << keyVector.at(i) << "\",";
+                }
+                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
+                break;
+            }
+            case TypeVarChar:
+            {
+                ;
+            }
+
+            default:
+                break;
+        }
+
+        printTabs(depth);
+        cout << "\"children\":[" << endl;
+        
+        for(unsigned i = 0; i < pageVector.size() - 1; i++)
+        {
+            dfsPrint(ixfileHandle, attribute, pageVector.at(i), depth + 1, false);
+        }
+        dfsPrint(ixfileHandle, attribute, pageVector.at(pageVector.size() - 1), depth + 1, true);
+        printTabs(depth);
+        cout << "]}";
+        if (!last) {
+            cout << ",";
+        }
+        cout << endl;
+    }
+    else {
+        vector<RID> RIDVector;
+        RID rid;
+        switch (type)
+        {
+            case TypeInt:
+            {
+                vector<int> keyVector;
+                while (offset < space - sizeof(int)) {//TODO: handle the pointer at the end
+                    int k;
+                    memcpy(&k, page+offset, sizeof(int));
+                    offset += sizeof(int);
+                    keyVector.push_back(k);
+                    memcpy(&rid, page+offset, sizeof(RID));
+                    offset += sizeof(RID);
+                    RIDVector.push_back(rid);
+                }
+                
+                for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                    cout << "\"" << keyVector.at(i) << ":";
+                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                }
+                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
+                break;
+            }
+            case TypeReal:
+            {
+                vector<float> keyVector;
+                while (offset < space - sizeof(int)) {//TODO: handle the pointer at the end
+                    float k;
+                    memcpy(&k, page+offset, sizeof(float));
+                    offset += sizeof(float);
+                    keyVector.push_back(k);
+                    memcpy(&rid, page+offset, sizeof(RID));
+                    offset += sizeof(RID);
+                    RIDVector.push_back(rid);
+                }
+                
+                for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                    cout << "\"" << keyVector.at(i) << ":";
+                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                }
+                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
+                break;
+            }
+            case TypeVarChar:
+            {
+                ;
+            }
+        
+            default:
+                break;
+        }
+        cout << "]}";
+        if (!last) {
+            cout << ",";
+        }
+        cout << endl;
+    }
+
+}
+
+void IndexManager::printTabs(int num) const {
+    for(int i = 0; i < num; i++)
+    {
+        cout << '\t';
+    }
 }
 
 RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixfileHandle, const void* key, const RID &rid, int curPageId, 
