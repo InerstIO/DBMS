@@ -100,7 +100,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     int retPageId2=0;
     //cout<<"rootNodePointer: "<<ixfileHandle.rootNodePointer<<endl;
     RID retRid;
-    cout<<*(int*)key<<": "<<ixfileHandle.rootNodePointer<<endl;
+    //cout<<*(int*)key<<": "<<ixfileHandle.rootNodePointer<<endl;
     return insertEntryHelper(attribute, ixfileHandle, key, rid, ixfileHandle.rootNodePointer, retPageId1, retKey, retRid, retPageId2);
 }
 
@@ -553,14 +553,13 @@ RC IndexManager::keyCompare(bool &res, const Attribute &attribute, const void* k
 RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, const Attribute &attribute, const void* key, 
     const RID &rid, int page1, int page2){
     if(attribute.type == 0){
-cout<<"insert internal: "<<*(int*)key<<", "<<page1<<", "<<page2<<", "<<pageId<<endl;
+//cout<<"insert internal: "<<*(int*)key<<", "<<page1<<", "<<page2<<", "<<pageId<<endl;
         void* page = malloc(PAGE_SIZE);
         ixfileHandle.fileHandle.readPage(pageId-1, page);
         void* newPage = malloc(PAGE_SIZE);
         int space;
         memcpy((char*)newPage, (char*)page, sizeof(bool));
         memcpy((char*)(&space), (char*)page+1, sizeof(int));
-        cout<<"562 space: "<<space<<endl;
         //first item to insert in this page, insert one key and two page ids
         if(space == 5){
             int offset = 5;
@@ -581,26 +580,31 @@ cout<<"insert internal: "<<*(int*)key<<", "<<page1<<", "<<page2<<", "<<pageId<<e
             int newOffset = offset;
             bool hasInserted = false;
             bool isFirst = true;
-            while(offset<space){
+            while(offset<space-sizeof(int)){
+                //cout<<"while: "<<offset<<", "<<space<<endl;
                 int beginPageId;
                 int pageId;
-                if(offset == 5){
-                    memcpy((char*)(&beginPageId), (char*)page+offset, sizeof(int));
-                    offset += sizeof(int);
-                }
                 if(!hasInserted){
-                    int k, pageNum, slotNum;
-                    memcpy((char*)(&k), (char*)page+offset, sizeof(int));
-                    offset += sizeof(int);
-                    memcpy((char*)(&pageNum), (char*)page+offset, sizeof(int));
-                    offset += sizeof(int);
-                    memcpy((char*)(&slotNum), (char*)page+offset, sizeof(int));
-                    offset += sizeof(int);
+                    int keyReaderPtr = offset+sizeof(int);
+                    int pageNum, slotNum;
+                    void* k = malloc(sizeof(int));
+                    //cout<<"key offset: "<<keyReaderPtr<<endl;
+                    memcpy((char*)(k), (char*)page+keyReaderPtr, sizeof(int));
+                    //offset += sizeof(int);
+                    keyReaderPtr += sizeof(int);
+                    memcpy((char*)(&pageNum), (char*)page+keyReaderPtr, sizeof(int));
+                    //offset += sizeof(int);
+                    keyReaderPtr += sizeof(int);
+                    memcpy((char*)(&slotNum), (char*)page+keyReaderPtr, sizeof(int));
+                    //offset += sizeof(int);
+                    keyReaderPtr += sizeof(int);
                     bool isSmall;
                     RID r;
                     r.pageNum = pageNum;
                     r.slotNum = slotNum;
-                    RC rc = keyCompare(isSmall, attribute, key, (void*)(&k), rid, r);
+                    RC rc = keyCompare(isSmall, attribute, key, k, rid, r);
+                    //cout<<"isSmall: "<<isSmall<<", "<<*(int*)key<<", "<<*(int*)k<<endl;
+                    free(k);
                     if(rc!=SUCCESS) return -1;
                     if(isSmall){
                         if(isFirst){
@@ -639,9 +643,7 @@ cout<<"insert internal: "<<*(int*)key<<", "<<page1<<", "<<page2<<", "<<pageId<<e
                         }
                     } else{
                         int size = 2*sizeof(int)+2*sizeof(unsigned);
-                        if(isFirst){
-                            size += sizeof(int);
-                        }
+                        //cout<<"append: "<<size<<", "<<newOffset<<", "<<offset<<endl;
                         memcpy((char*)newPage+newOffset, (char*)page+offset, size);
                         offset += size;
                         newOffset += size;
@@ -652,16 +654,18 @@ cout<<"insert internal: "<<*(int*)key<<", "<<page1<<", "<<page2<<", "<<pageId<<e
                 isFirst = false;
             }
             if(!hasInserted){
+                //cout<<"insertlast"<<endl;
+                memcpy((char*)newPage+newOffset, (char*)page+offset, sizeof(int));
+                newOffset += sizeof(int);
                 memcpy((char*)newPage+newOffset, (char*)key, sizeof(int));
                 newOffset += sizeof(int);
-                memcpy((char*)newPage+newOffset, (char*)(rid.pageNum), sizeof(unsigned));
+                memcpy((char*)newPage+newOffset, (char*)(&rid.pageNum), sizeof(unsigned));
                 newOffset += sizeof(unsigned);
-                memcpy((char*)newPage+newOffset, (char*)(rid.slotNum), sizeof(unsigned));
+                memcpy((char*)newPage+newOffset, (char*)(&rid.slotNum), sizeof(unsigned));
                 newOffset += sizeof(unsigned);
                 memcpy((char*)newPage+newOffset, (char*)(&page2), sizeof(int));
                 newOffset += sizeof(int);
                 memcpy((char*)newPage+1, (char*)(&newOffset), sizeof(int));
-                cout<<"insert at last: "<<newOffset<<endl;
             }
         }
         ixfileHandle.fileHandle.writePage(pageId-1, newPage);
@@ -768,7 +772,7 @@ RC IndexManager::splitLeafPage(IXFileHandle& ixfileHandle, int pageId, int &newP
         memcpy((char*)key, (char*)page+offset, sizeof(int));
         memcpy((char*)(&rid.pageNum), (char*)page+offset+sizeof(int), sizeof(unsigned));
         memcpy((char*)(&rid.slotNum), (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
-        cout<<"split: "<<*(int*)key<<", "<<rid.pageNum<<", "<<rid.slotNum<<", "<<offset<<endl;
+        //cout<<"split: "<<*(int*)key<<", "<<rid.pageNum<<", "<<rid.slotNum<<", "<<offset<<endl;
         while(offset+itemSize <= PAGE_SIZE){
             memcpy((char*)newPage+newOffset, (char*)page+offset, itemSize);
             offset += itemSize;
