@@ -61,6 +61,7 @@ class IndexManager {
         RC insertInternalNode(IXFileHandle& ixfileHandle, int pageId, const Attribute &attribute, const void* key, const RID &rid, int page1, int page2);
         //input page to split, return newpageid, push-up key, push-up rid
         RC splitLeafPage(IXFileHandle& ixfileHandle, int pageId1, int &newPageId, void* key, RID& rid, const Attribute &attribute);
+        RC splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &newPageId, void* key, RID& rid, const Attribute &attribute);
         // dfs helper function for tree printing
         void dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribute, unsigned pageId, int depth, bool last) const;
         // print num of tabs
