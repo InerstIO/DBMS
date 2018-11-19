@@ -602,7 +602,7 @@ cout<<"insert internal: "<<*(int*)key<<", "<<page1<<", "<<page2<<", "<<pageId<<e
                     r.slotNum = slotNum;
                     RC rc = keyCompare(isSmall, attribute, key, (void*)(&k), rid, r);
                     if(rc!=SUCCESS) return -1;
-                    if(!isSmall){
+                    if(isSmall){
                         if(isFirst){
                             //put page1, new key, then everything from old page
                             memcpy((char*)newPage+newOffset, (char*)(&page1), sizeof(int));
@@ -688,15 +688,17 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
         memcpy((char*)(newPage), (char*)page, 2*sizeof(int)+sizeof(bool));
         bool hasInserted = false;
         while(offset < space){
-            int k;
-            memcpy(&k, (char*)page+offset, sizeof(int));
+            void* k = malloc(sizeof(int));
+            memcpy((char*)k, (char*)page+offset, sizeof(int));
             RID r;
             memcpy(&(r.pageNum), (char*)page+offset+sizeof(int), sizeof(unsigned));
             memcpy(&(r.slotNum), (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
             bool isSmall;
-            RC rc = keyCompare(isSmall, attribute, key, (void*)(&k), rid, r);
+            RC rc = keyCompare(isSmall, attribute, key, k, rid, r);
+            //cout<<"ismall: "<<isSmall<<", "<<*(int*)key<<", "<<*(int*)k<<endl;
+            free(k);
             if(!rc==SUCCESS)   return -1;
-            if(!isSmall && !hasInserted){
+            if(isSmall && !hasInserted){
                 memcpy((char*)newPage+newOffset, (char*)key, sizeof(int));
                 newOffset += sizeof(int);
                 memcpy((char*)newPage+newOffset, (char*)(&rid.pageNum), sizeof(unsigned));
