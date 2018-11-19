@@ -83,6 +83,19 @@ class IX_ScanIterator {
 
         // Terminate index scan
         RC close();
+        
+        IXFileHandle* ixfileHandle;
+        int type;
+        const void *lowKey;
+        const void *highKey;
+        bool lowKeyInclusive;
+        bool highKeyInclusive;
+        void* loadedPage;
+        int offset;
+        int space;
+    private:
+        // return true if key1 smaller (or equal, depends on inclusive) than key2
+        RC compare(bool isSmaller, const int type, const void* key1, const void* key2, const bool inclusive);
 };
 
 

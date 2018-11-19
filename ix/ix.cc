@@ -2,6 +2,7 @@
 #include "ix.h"
 #include <stack>
 #include <vector>
+#include <string.h>
 
 IndexManager* IndexManager::_index_manager = 0;
 
@@ -861,6 +862,94 @@ IX_ScanIterator::~IX_ScanIterator()
 
 RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 {
+    if (offset > space - (int)sizeof(int)) {
+        return -1;
+    }
+    else if (offset == space - (int)sizeof(int))
+    {
+        int pageNum;
+        memcpy(&pageNum, (char *)loadedPage+offset, sizeof(int));
+        ixfileHandle->fileHandle.readPage(pageNum, loadedPage);
+        offset = sizeof(bool) + sizeof(int);
+    }
+    
+    switch (type)
+    {
+        case TypeInt:
+            memcpy((int *)key, (char *)loadedPage+offset, sizeof(int));
+            offset += sizeof(int);
+            break;
+        case TypeReal:
+            memcpy((float *)key, (char *)loadedPage+offset, sizeof(float));
+            offset += sizeof(float);
+            break;
+        case TypeVarChar:
+            int length;
+            memcpy(&length, (char *)loadedPage+offset, sizeof(int));
+            offset += sizeof(int);
+            memcpy((char *)key, (char *)loadedPage+offset, length);
+            offset += length;
+        default:
+            break;
+    }
+    bool isSmaller;
+    RC rc = compare(isSmaller, type, key, highKey, highKeyInclusive);
+    if (rc) {
+        return -1;
+    }
+    if (!isSmaller) {
+        return IX_EOF;
+    }
+    memcpy(&rid, (char *)loadedPage+offset, sizeof(RID));
+    offset += sizeof(RID);
+    
+    return 0;
+}
+
+RC IX_ScanIterator::compare(bool isSmaller, const int type, const void* key1, const void* key2, const bool inclusive) {
+    switch (type)
+    {
+        case TypeInt:
+        {
+            int k1;
+            int k2;
+            memcpy((char *)(&k1), (char *)key1, sizeof(int));
+            memcpy((char *)(&k2), (char *)key2, sizeof(int));
+            if (inclusive) {
+                isSmaller = k1 <= k2;
+            }
+            else {
+                isSmaller = k1 < k2;
+            }
+            return 0;
+        }
+        case TypeReal:
+        {
+            float k1;
+            float k2;
+            memcpy((char *)(&k1), (char *)key1, sizeof(float));
+            memcpy((char *)(&k2), (char *)key2, sizeof(float));
+            if (inclusive) {
+                isSmaller = k1 <= k2;
+            }
+            else {
+                isSmaller = k1 < k2;
+            }
+            return 0;
+        }
+        case TypeVarChar:
+        {
+            if (inclusive) {
+                isSmaller = strcmp((char *)key1, (char *)key2) <= 0;
+            }
+            else {
+                isSmaller = strcmp((char *)key1, (char *)key2) < 0;
+            }
+            return 0;
+        }
+        default:
+            break;
+    }
     return -1;
 }
 
