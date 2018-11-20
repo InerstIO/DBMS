@@ -161,6 +161,7 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
     int prevPagePointer;
     void* key;
     int length;
+    RC rc;
 
     if (isLeaf) {
         ix_ScanIterator.offset += sizeof(int);
@@ -175,25 +176,39 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
             case TypeInt:
                 key = malloc(sizeof(int));
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
+                rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
+                if (rc) {
+                    free(key);
+                    return -1;
+                }
+                free(key);
                 break;
             case TypeReal:
                 key = malloc(sizeof(float));
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(float));
+                rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
+                if (rc) {
+                    free(key);
+                    return -1;
+                }
+                free(key);
                 break;
             case TypeVarChar:
                 memcpy(&length, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
                 ix_ScanIterator.offset += sizeof(int);
                 key = malloc(sizeof(length));
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
+                rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
+                if (rc) {
+                    free(key);
+                    return -1;
+                }
+                free(key);
                 break;
             default:
                 break;
         }
-        RC rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
-        if (rc) {
-            free(key);
-            return -1;
-        }
+
         if (isSmaller) {
             break;
         }
@@ -222,7 +237,6 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
         ix_ScanIterator.offset = sizeof(bool) + sizeof(int);
         memcpy(&ix_ScanIterator.space, (char *)ix_ScanIterator.loadedPage+sizeof(bool), sizeof(int));
     }
-    free(key);
     return 0;
 }
 
