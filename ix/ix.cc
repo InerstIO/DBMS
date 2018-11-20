@@ -242,6 +242,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
     else {
         vector<RID> RIDVector;
         RID rid;
+        offset += sizeof(int);
         switch (type)
         {
             case TypeInt:
