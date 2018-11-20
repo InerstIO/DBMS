@@ -218,7 +218,7 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
             memcpy(&prevPagePointer, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
             ix_ScanIterator.offset += sizeof(int);
         }
-        ixfileHandle.fileHandle.readPage(prevPagePointer, ix_ScanIterator.loadedPage);
+        ixfileHandle.fileHandle.readPage(prevPagePointer-1, ix_ScanIterator.loadedPage);
         ix_ScanIterator.offset = sizeof(bool) + sizeof(int);
         memcpy(&ix_ScanIterator.space, (char *)ix_ScanIterator.loadedPage+sizeof(bool), sizeof(int));
     }
@@ -985,7 +985,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
         if (pageNum == 0) {
             return IX_EOF;
         }
-        ixfileHandle->fileHandle.readPage(pageNum, loadedPage);
+        ixfileHandle->fileHandle.readPage(pageNum-1, loadedPage);
         offset = sizeof(bool);
         memcpy(&space, (char *)loadedPage+offset, sizeof(int));
         offset += 2 * sizeof(int);
