@@ -981,14 +981,14 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
     else if (offset == space)
     {
         int pageNum;
-        memcpy(&pageNum, (char *)loadedPage+offset, sizeof(int));
+        memcpy(&pageNum, (char *)loadedPage+sizeof(bool)+sizeof(int), sizeof(int));
         if (pageNum == 0) {
             return IX_EOF;
         }
         ixfileHandle->fileHandle.readPage(pageNum, loadedPage);
         offset = sizeof(bool);
         memcpy(&space, (char *)loadedPage+offset, sizeof(int));
-        offset += sizeof(int);
+        offset += 2 * sizeof(int);
     }
     
     switch (type)
