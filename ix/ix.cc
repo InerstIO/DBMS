@@ -1078,7 +1078,8 @@ RC IX_ScanIterator::compare(bool &isSmaller, const int type, const void* key1, c
 
 RC IX_ScanIterator::close()
 {
-    return -1;
+    free(loadedPage);
+    return 0;
 }
 
 
