@@ -248,7 +248,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeInt:
             {
                 vector<int> keyVector;
-                while (offset < space - (int)sizeof(int)) {//TODO: handle the pointer at the end
+                while (offset < space) {
                     int k;
                     memcpy(&k, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
@@ -269,7 +269,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeReal:
             {
                 vector<float> keyVector;
-                while (offset < space - (int)sizeof(int)) {//TODO: handle the pointer at the end
+                while (offset < space) {
                     float k;
                     memcpy(&k, (char *)page+offset, sizeof(float));
                     offset += sizeof(float);
@@ -290,7 +290,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
             case TypeVarChar:
             {
                 vector<char*> keyVector;
-                while (offset < space - (int)sizeof(int)) {//TODO: handle the pointer at the end
+                while (offset < space) {
                     int length;
                     memcpy(&length, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
@@ -864,13 +864,16 @@ IX_ScanIterator::~IX_ScanIterator()
 
 RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 {
-    if (offset > space - (int)sizeof(int)) {
+    if (offset > space) {
         return -1;
     }
-    else if (offset == space - (int)sizeof(int))
+    else if (offset == space)
     {
         int pageNum;
         memcpy(&pageNum, (char *)loadedPage+offset, sizeof(int));
+        if (pageNum == 0) {
+            return IX_EOF;
+        }
         ixfileHandle->fileHandle.readPage(pageNum, loadedPage);
         offset = sizeof(bool);
         memcpy(&space, (char *)loadedPage+offset, sizeof(int));
