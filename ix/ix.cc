@@ -118,7 +118,118 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         bool        	highKeyInclusive,
         IX_ScanIterator &ix_ScanIterator)
 {
-    return -1;
+    ix_ScanIterator.ixfileHandle = &ixfileHandle;
+    ix_ScanIterator.type = attribute.type;
+    ix_ScanIterator.lowKey = lowKey;
+    ix_ScanIterator.highKey = highKey;
+    ix_ScanIterator.lowKeyInclusive = lowKeyInclusive;
+    ix_ScanIterator.highKeyInclusive = highKeyInclusive;
+    ix_ScanIterator.loadedPage = malloc(PAGE_SIZE);
+    RC rc = ixfileHandle.fileHandle.readPage(ixfileHandle.rootNodePointer - 1, ix_ScanIterator.loadedPage);
+    if (rc) {
+        return -1;
+    }
+    memcpy(&ix_ScanIterator.space, (char *)ix_ScanIterator.loadedPage+sizeof(bool), sizeof(int));
+    ix_ScanIterator.offset = sizeof(bool) + sizeof(int);
+    // find starting page, space and offset
+    rc = findLeafKey(ixfileHandle, ix_ScanIterator);
+    if (rc) {
+        return -1;
+    }
+    return 0;
+}
+
+RC IndexManager::findLeafKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIterator) {
+    bool isLeaf = isLeafPage(ix_ScanIterator.loadedPage);
+    while (!isLeaf) {
+        RC rc = findKey(ixfileHandle, ix_ScanIterator, isLeaf);
+        if (rc) {
+            return -1;
+        }
+        isLeaf = isLeafPage(ix_ScanIterator.loadedPage);
+    }
+    RC rc = findKey(ixfileHandle, ix_ScanIterator, true);
+    if (rc) {
+        return -1;
+    }
+    return 0;
+}
+
+RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIterator, bool isLeaf) {
+    int type = ix_ScanIterator.type;
+    bool isSmaller = false;
+    int prevPagePointer;
+    void* key;
+    int length;
+
+    if (isLeaf) {
+        ix_ScanIterator.offset += sizeof(int);
+    }
+    while (ix_ScanIterator.offset < ix_ScanIterator.space - (int)sizeof(int)) {
+        if (!isLeaf) {
+            memcpy(&prevPagePointer, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
+            ix_ScanIterator.offset += sizeof(int);
+        }
+        switch (type)
+        {
+            case TypeInt:
+                key = malloc(sizeof(int));
+                memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
+                break;
+            case TypeReal:
+                key = malloc(sizeof(float));
+                memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(float));
+                break;
+            case TypeVarChar:
+                memcpy(&length, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
+                ix_ScanIterator.offset += sizeof(int);
+                key = malloc(sizeof(length));
+                memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
+                break;
+            default:
+                break;
+        }
+        RC rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
+        if (rc) {
+            free(key);
+            return -1;
+        }
+        if (isSmaller) {
+            break;
+        }
+        
+        switch (type)
+        {
+            case TypeInt:
+                ix_ScanIterator.offset += sizeof(int) + sizeof(RID);                
+                break;
+            case TypeReal:
+                ix_ScanIterator.offset += sizeof(float) + sizeof(RID);
+                break;
+            case TypeVarChar:
+                ix_ScanIterator.offset += sizeof(int) + length + sizeof(RID);
+                break;
+            default:
+                break;
+        }
+    }
+    if (!isLeaf) {
+        if (!isSmaller) {
+            memcpy(&prevPagePointer, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
+            ix_ScanIterator.offset += sizeof(int);
+        }
+        ixfileHandle.fileHandle.readPage(prevPagePointer, ix_ScanIterator.loadedPage);
+        ix_ScanIterator.offset = sizeof(bool) + sizeof(int);
+        memcpy(&ix_ScanIterator.space, (char *)ix_ScanIterator.loadedPage+sizeof(bool), sizeof(int));
+    }
+    free(key);
+    return 0;
+}
+
+bool IndexManager::isLeafPage(void* page) {
+    bool isLeaf;
+    memcpy(&isLeaf, page, sizeof(bool));
+    return isLeaf;
 }
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
@@ -883,19 +994,20 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
     switch (type)
     {
         case TypeInt:
-            memcpy((int *)key, (char *)loadedPage+offset, sizeof(int));
+            memcpy(key, (char *)loadedPage+offset, sizeof(int));
             offset += sizeof(int);
             break;
         case TypeReal:
-            memcpy((float *)key, (char *)loadedPage+offset, sizeof(float));
+            memcpy(key, (char *)loadedPage+offset, sizeof(float));
             offset += sizeof(float);
             break;
         case TypeVarChar:
             int length;
             memcpy(&length, (char *)loadedPage+offset, sizeof(int));
             offset += sizeof(int);
-            memcpy((char *)key, (char *)loadedPage+offset, length);
+            memcpy(key, (char *)loadedPage+offset, length);
             offset += length;
+            break;
         default:
             break;
     }

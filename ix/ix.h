@@ -66,6 +66,12 @@ class IndexManager {
         void dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribute, unsigned pageId, int depth, bool last) const;
         // print num of tabs
         void printTabs(int num) const;
+        // find the left most offset
+        RC findLeafKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIterator);
+        // check whether the page is a leaf page
+        bool isLeafPage(void* page);
+        // find the offset of lowKey and load the next page if current not leaf
+        RC findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIterator, bool isLeaf);
 };
 
 
@@ -93,9 +99,8 @@ class IX_ScanIterator {
         void* loadedPage;
         int offset;
         int space;
-    private:
         // return true if key1 smaller (or equal, depends on inclusive) than key2
-        RC compare(bool isSmaller, const int type, const void* key1, const void* key2, const bool inclusive);
+        RC compare(bool &isSmaller, const int type, const void* key1, const void* key2, const bool inclusive);
 };
 
 
