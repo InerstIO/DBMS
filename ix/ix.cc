@@ -871,7 +871,9 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
         int pageNum;
         memcpy(&pageNum, (char *)loadedPage+offset, sizeof(int));
         ixfileHandle->fileHandle.readPage(pageNum, loadedPage);
-        offset = sizeof(bool) + sizeof(int);
+        offset = sizeof(bool);
+        memcpy(&space, (char *)loadedPage+offset, sizeof(int));
+        offset += sizeof(int);
     }
     
     switch (type)
