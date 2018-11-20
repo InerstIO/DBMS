@@ -913,7 +913,11 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
     return 0;
 }
 
-RC IX_ScanIterator::compare(bool isSmaller, const int type, const void* key1, const void* key2, const bool inclusive) {
+RC IX_ScanIterator::compare(bool &isSmaller, const int type, const void* key1, const void* key2, const bool inclusive) {
+    if (key1 == NULL || key2 == NULL) {
+        isSmaller = true;
+        return 0;
+    }
     switch (type)
     {
         case TypeInt:
