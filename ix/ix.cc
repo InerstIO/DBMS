@@ -161,6 +161,7 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
     int prevPagePointer;
     void* key;
     int length;
+    RC rc;
 
     if (isLeaf) {
         ix_ScanIterator.offset += sizeof(int);
@@ -175,25 +176,39 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
             case TypeInt:
                 key = malloc(sizeof(int));
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
+                rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
+                if (rc) {
+                    free(key);
+                    return -1;
+                }
+                free(key);
                 break;
             case TypeReal:
                 key = malloc(sizeof(float));
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(float));
+                rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
+                if (rc) {
+                    free(key);
+                    return -1;
+                }
+                free(key);
                 break;
             case TypeVarChar:
                 memcpy(&length, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
                 ix_ScanIterator.offset += sizeof(int);
                 key = malloc(sizeof(length));
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
+                rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
+                if (rc) {
+                    free(key);
+                    return -1;
+                }
+                free(key);
                 break;
             default:
                 break;
         }
-        RC rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
-        if (rc) {
-            free(key);
-            return -1;
-        }
+
         if (isSmaller) {
             break;
         }
@@ -222,7 +237,6 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
         ix_ScanIterator.offset = sizeof(bool) + sizeof(int);
         memcpy(&ix_ScanIterator.space, (char *)ix_ScanIterator.loadedPage+sizeof(bool), sizeof(int));
     }
-    free(key);
     return 0;
 }
 
@@ -278,10 +292,12 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << "\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << "\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 break;
             }
             case TypeReal:
@@ -299,10 +315,12 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << "\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << "\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 break;
             }
             case TypeVarChar:
@@ -324,10 +342,12 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << "\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << "\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 break;
             }
 
@@ -369,12 +389,14 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     RIDVector.push_back(rid);
                 }
                 
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << ":";
-                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << ":";
+                        cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                    cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
-                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 break;
             }
             case TypeReal:
@@ -390,12 +412,14 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     RIDVector.push_back(rid);
                 }
                 
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << ":";
-                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << ":";
+                        cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                    cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
-                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 break;
             }
             case TypeVarChar:
@@ -414,12 +438,14 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     RIDVector.push_back(rid);
                 }
                 
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << ":";
-                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << ":";
+                        cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                    cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
-                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 break;
             }
             default:
