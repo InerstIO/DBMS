@@ -102,6 +102,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
     }
     if (count != 5001)
     {
+cout<<count<<endl;
         cerr << count << " - Wrong entries output...failure" << endl;
         goto error_close_scan;
     }
@@ -112,7 +113,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
 
     rc = ix_ScanIterator2.close();
     assert(rc == success && "IX_ScanIterator::close() should not fail.");
-
+cout<<"first scan"<<endl;
     
     // insert more entries Again
     numOfTuples = 30000;
@@ -134,7 +135,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
         rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
     }
-
+cout<<"insert more"<<endl;
     // scan
     compVal = 35000;
 
@@ -147,6 +148,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
     count = 0;
     while(ix_ScanIterator1.getNextEntry(rid, &key) == success)
     {
+cout<<key<<endl;
         if (ix_ScanIterator2.getNextEntry(rid2, &key) != success) {
             cerr << "Wrong entries output...failure" << endl;
             goto error_close_scan;
