@@ -23,7 +23,7 @@ int testCase_2(const string &indexFileName, const Attribute &attribute)
 
     RID rid;
     int key = 200;
-    rid.pageNum = 400;
+    rid.pageNum = 500;
     rid.slotNum = 20;
 
     unsigned readPageCount = 0;
@@ -48,10 +48,9 @@ int testCase_2(const string &indexFileName, const Attribute &attribute)
     cerr << endl << "Before Insert - R W A: " << readPageCount << " " <<  writePageCount << " " << appendPageCount << endl;
 
     // insert entry
-for(int i=0;i<500;i++){
     rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
     assert(rc == success && "indexManager::insertEntry() should not fail.");
-}
+
     // collect counters
     rc = ixfileHandle.collectCounterValues(readPageCountAfter, writePageCountAfter, appendPageCountAfter);
     assert(rc == success && "indexManager::collectCounterValues() should not fail.");
@@ -72,7 +71,7 @@ for(int i=0;i<500;i++){
 
     // print BTree, by this time the BTree should have only one node
     cerr << endl;
-    //indexManager->printBtree(ixfileHandle, attribute);
+    indexManager->printBtree(ixfileHandle, attribute);
 
     // close index file
     rc = indexManager->closeFile(ixfileHandle);
