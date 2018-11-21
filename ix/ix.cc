@@ -1988,7 +1988,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
     if (offset > space) {
         return -1;
     }
-    else if (offset == space)
+    while (offset == space)
     {
         int pageNum;
         memcpy(&pageNum, (char *)loadedPage+sizeof(bool)+sizeof(int), sizeof(int));
