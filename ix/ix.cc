@@ -292,10 +292,12 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << "\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << "\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 break;
             }
             case TypeReal:
@@ -313,10 +315,12 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << "\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << "\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 break;
             }
             case TypeVarChar:
@@ -338,10 +342,12 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << "\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << "\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
                 break;
             }
 
@@ -383,12 +389,14 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     RIDVector.push_back(rid);
                 }
                 
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << ":";
-                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << ":";
+                        cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                    cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
-                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 break;
             }
             case TypeReal:
@@ -404,12 +412,14 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     RIDVector.push_back(rid);
                 }
                 
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << ":";
-                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << ":";
+                        cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                    cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
-                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 break;
             }
             case TypeVarChar:
@@ -428,12 +438,14 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     RIDVector.push_back(rid);
                 }
                 
-                for (unsigned i=0; i<keyVector.size() - 1; i++) {
-                    cout << "\"" << keyVector.at(i) << ":";
-                    cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                if (!keyVector.empty()) {
+                    for (unsigned i=0; i<keyVector.size() - 1; i++) {
+                        cout << "\"" << keyVector.at(i) << ":";
+                        cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                    }
+                    cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
+                    cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 }
-                cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
-                cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
                 break;
             }
             default:
