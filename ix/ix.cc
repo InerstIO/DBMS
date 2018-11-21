@@ -549,6 +549,7 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                             memcpy((char*)(&realPushupKeySize), (char*)pushupKey, sizeof(int));
                         }
                         realPushupKeySize += 4;
+                        cout<<"real pushup key size: "<<realPushupKeySize<<", "<<pushupRid.pageNum<<", "<<pushupRid.slotNum<<endl;
                         int size = 21+realPushupKeySize;
                         memcpy((char*)rootPage+1, &size, sizeof(int));
                         memcpy((char*)rootPage+5, &curPageId, sizeof(int));
@@ -565,7 +566,7 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                     } else{
                         insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
                     }
-                    memcpy((char*)retKey, (char*)pushupKey, sizeof(int));
+                    memcpy((char*)retKey, (char*)pushupKey, pushupKeySize);
                     free(pushupKey);
                     retRid = pushupRid;
                     retPageId1 = curPageId;
@@ -1035,6 +1036,21 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
                     r.pageNum = pageNum;
                     r.slotNum = slotNum;
                     cout<<"before key compare"<<endl;
+        int size1, size2;
+        memcpy((char*)(&size1), (char*)key, sizeof(int));
+        memcpy((char*)(&size2), (char*)k, sizeof(int));
+        char* k1ptr = new char[size1+1];
+        char* k2ptr = new char[size2+1];
+        cout<<size1<<", "<<size2<<endl;
+        memcpy(k1ptr, (char*)key+sizeof(int), size1);
+        memcpy(k2ptr, (char*)k+sizeof(int), size2);
+        k1ptr[size1]='\0';
+        k2ptr[size2]='\0';
+        string k1(k1ptr);
+        string k2(k2ptr);
+        cout<<k1<<", "<<k2<<endl;
+        free(k1ptr);
+        free(k2ptr);
                     RC rc = keyCompare(isSmall, attribute, key, k, rid, r);
                     cout<<"issmall: "<<isSmall<<endl;
                     free(k);
