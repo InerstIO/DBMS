@@ -1587,6 +1587,7 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
             memcpy((char*)newPage+newOffset, (char*)(&rid.slotNum), sizeof(unsigned));
             newOffset += sizeof(unsigned);
             hasInserted = true;
+            delete[] str;
         }
         //cout<<"after nothasinserted"<<endl;
         int itemSize = keySize+2*sizeof(unsigned);
