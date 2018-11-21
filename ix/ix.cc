@@ -707,6 +707,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     memcpy(&rid, (char *)page+offset, sizeof(RID));
                     offset += sizeof(RID);
                     RIDVector.push_back(rid);
+                    free(k);
                 }
                 
                 if (!keyVector.empty()) {
@@ -763,7 +764,7 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
         int newPageId;
         RC rc = createNewPage(true, ixfileHandle, newPageId);
         ixfileHandle.rootNodePointer = newPageId;
-        if(rc != SUCCESS) return rc;
+        if(rc != SUCCESS) {return rc; free(curRetKeyPtr); retPageId2=0; retPageId1=0;}
         //rc = insertLeaf(ixfileHandle, newPageId, attribute, key, rid);
         //if(rc != SUCCESS) return rc;
         retPageId1 = 0;
@@ -841,6 +842,9 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                         memcpy((char*)rootPage+17+realPushupKeySize, &(newPageId), sizeof(int));
                         ixfileHandle.fileHandle.writePage(newRootPageId-1, rootPage);
                         free(rootPage);
+                        free(pushupKey);
+                        free(page);
+                        free(curRetKeyPtr);
                         return SUCCESS;
                     }
                     if(isSmall){
@@ -1536,6 +1540,7 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
         void* page = malloc(PAGE_SIZE);
         ixfileHandle.fileHandle.readPage(pageId-1, page);
         void* newPage = malloc(PAGE_SIZE);
+        memset((char*)newPage, 0, PAGE_SIZE);
         int space;
         memcpy(&space, (char*)page+1, sizeof(int));
         int offset = 9;
