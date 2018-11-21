@@ -106,7 +106,83 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
-    return -1;
+    int pageId = ixfileHandle.rootNodePointer;
+    int offset = 5;
+    findVictimLeafKey(ixfileHandle, pageId, offset, attribute, key, rid);
+    void* page = malloc(PAGE_SIZE);
+    ixfileHandle.fileHandle.readPage(pageId-1, page);
+    if(attribute.type == TypeInt){
+        int victimKey;
+        RID victimRid;
+        memcpy(&victimKey, (char*)page+offset, sizeof(int));
+        memcpy(&victimRid.pageNum, (char*)page+offset+sizeof(int), sizeof(unsigned));
+        memcpy(&victimRid.slotNum, (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
+        int itemSize = sizeof(int)+2*sizeof(unsigned);
+        cout<<victimKey<<", "<<victimRid.pageNum<<", "<<victimRid.slotNum<<endl;
+        if(victimKey==*(int*)key && rid.pageNum==victimRid.pageNum && rid.slotNum==victimRid.slotNum){
+            void* newPage = malloc(PAGE_SIZE);
+            memset(newPage,0,PAGE_SIZE);
+            memcpy((char*)newPage, (char*)page, offset);
+            memcpy((char*)newPage+offset, (char*)page+offset+itemSize, PAGE_SIZE-offset-itemSize);
+            ixfileHandle.fileHandle.writePage(pageId-1, newPage);
+            free(newPage);
+        } else{
+            free(page);
+            return -1;
+        }
+    } else if(attribute.type == TypeReal){
+        float victimKey;
+        RID victimRid;
+        memcpy(&victimKey, (char*)page+offset, sizeof(int));
+        memcpy(&victimRid.pageNum, (char*)page+offset+sizeof(float), sizeof(unsigned));
+        memcpy(&victimRid.slotNum, (char*)page+offset+sizeof(float)+sizeof(unsigned), sizeof(unsigned));
+        int itemSize = sizeof(float)+2*sizeof(unsigned);
+        if(victimKey==*(float*)key && rid.pageNum==victimRid.pageNum && rid.slotNum==victimRid.slotNum){
+            void* newPage = malloc(PAGE_SIZE);
+            memset(newPage,0,PAGE_SIZE);
+            memcpy((char*)newPage, (char*)page, offset);
+            memcpy((char*)newPage+offset, (char*)page+offset+itemSize, PAGE_SIZE-offset-itemSize);
+            ixfileHandle.fileHandle.writePage(pageId-1, newPage);
+            free(newPage);
+        } else{
+            free(page);
+            return -1;
+        }
+    } else if(attribute.type == TypeVarChar){
+        int keySize, victimKeySize;
+        RID victimRid;
+        memcpy((char*)(&keySize), (char*)key, sizeof(int));
+        memcpy((char*)(&victimKeySize), (char*)page+offset, sizeof(int));
+        char* keyptr = new char[keySize+1];
+        char* vicKeyptr = new char[victimKeySize+1];
+        memcpy(keyptr, (char*)key+sizeof(int), keySize);
+        memcpy(vicKeyptr, (char*)page+offset+sizeof(int), victimKeySize);
+        memcpy(&victimRid.pageNum, (char*)page+offset+sizeof(int)+victimKeySize, sizeof(unsigned));
+        memcpy(&victimRid.slotNum, (char*)page+offset+sizeof(int)+victimKeySize+sizeof(unsigned), sizeof(unsigned));
+        keyptr[keySize]='\0';
+        vicKeyptr[victimKeySize]='\0';
+        string keystr(keyptr);
+        string vickeystr(vicKeyptr);
+        delete[](keyptr);
+        delete[](vicKeyptr);
+        if(keystr==vickeystr && rid.pageNum==victimRid.pageNum && rid.slotNum==victimRid.slotNum){
+            int itemSize = sizeof(int)+2*sizeof(unsigned)+victimKeySize;
+            void* newPage = malloc(PAGE_SIZE);
+            memset(newPage,0,PAGE_SIZE);
+            memcpy((char*)newPage, (char*)page, offset);
+            memcpy((char*)newPage+offset, (char*)page+offset+itemSize, PAGE_SIZE-offset-itemSize);
+            ixfileHandle.fileHandle.writePage(pageId-1, newPage);
+            free(newPage);
+        } else{
+            free(page);
+            return -1;
+        }
+    } else{
+        free(page);
+        return -1;
+    }
+    free(page);
+    return SUCCESS;
 }
 
 
@@ -137,6 +213,132 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     if (rc) {
         return -1;
     }
+    return 0;
+}
+
+RC IndexManager::findVictimLeafKey(IXFileHandle &ixfileHandle, int& pageId, int& offset, const Attribute& attribute, const void* victimKey, 
+        const RID& victimRid) {
+    void* page = malloc(PAGE_SIZE);
+    ixfileHandle.fileHandle.readPage(pageId-1, page);
+    bool isLeaf = isLeafPage(page);
+    free(page);
+    while (!isLeaf) {
+        RC rc = findVictimKey(ixfileHandle, pageId, offset, attribute, true, victimKey, victimRid);
+        if (rc) {
+            free(page);
+            return -1;
+        }
+        void* page = malloc(PAGE_SIZE);
+        ixfileHandle.fileHandle.readPage(pageId-1, page);
+        isLeaf = isLeafPage(page);
+        free(page);
+    }
+
+    RC rc = findVictimKey(ixfileHandle, pageId, offset, attribute, true, victimKey, victimRid);
+    if (rc) {
+        free(page);
+        return -1;
+    }
+    return 0;
+}
+
+RC IndexManager::findVictimKey(IXFileHandle &ixfileHandle, int& pageId, int& offset, const Attribute& attribute, bool isLeaf, 
+        const void* victimKey, const RID& victimRid) {
+    int type = attribute.type;
+    bool isSmaller = false;
+    int prevPagePointer;
+    void* key;
+    int length;
+    RID rid;
+    RC rc;
+    void* page = malloc(PAGE_SIZE);
+    ixfileHandle.fileHandle.readPage(pageId-1, page);
+    int space;
+    memcpy(&space, (char*)page+1, sizeof(int));
+
+    if (isLeaf) {
+        offset += sizeof(int);
+    }
+    while (offset < space - (int)sizeof(int)) {
+        if (!isLeaf) {
+            memcpy(&prevPagePointer, (char *)page+offset, sizeof(int));
+            offset += sizeof(int);
+        }
+        switch (type)
+        {
+            case TypeInt:
+                key = malloc(sizeof(int));
+                memcpy(key, (char *)page+offset, sizeof(int));
+                memcpy(&rid.pageNum, (char*)page+offset+sizeof(int), sizeof(unsigned));
+                memcpy(&rid.slotNum, (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
+                rc = keyCompare(isSmaller, attribute, victimKey, key, victimRid, rid);
+                if (rc) {
+                    free(page);
+                    free(key);
+                    return -1;
+                }
+                free(key);
+                break;
+            case TypeReal:
+                key = malloc(sizeof(float));
+                memcpy(key, (char *)page+offset, sizeof(float));
+                memcpy(&rid.pageNum, (char*)page+offset+sizeof(float), sizeof(unsigned));
+                memcpy(&rid.slotNum, (char*)page+offset+sizeof(float)+sizeof(unsigned), sizeof(unsigned));
+                rc = keyCompare(isSmaller, attribute, victimKey, key, victimRid, rid);
+                if (rc) {
+                    free(key);
+                    free(page);
+                    return -1;
+                }
+                free(key);
+                break;
+            case TypeVarChar:
+                memcpy(&length, (char *)page+offset, sizeof(int));
+                key = malloc(sizeof(length));
+                memcpy(&rid.pageNum, (char*)page+offset+length, sizeof(unsigned));
+                memcpy(&rid.slotNum, (char*)page+offset+length+sizeof(unsigned), sizeof(unsigned));
+                rc = keyCompare(isSmaller, attribute, victimKey, key, victimRid, rid);
+                if (rc) {
+                    free(key);
+                    free(page);
+                    return -1;
+                }
+                free(key);
+                break;
+            default:
+                break;
+        }
+
+        if (isSmaller) {
+            break;
+        }
+        
+        switch (type)
+        {
+            case TypeInt:
+                offset += sizeof(int) + sizeof(RID);                
+                break;
+            case TypeReal:
+                offset += sizeof(float) + sizeof(RID);
+                break;
+            case TypeVarChar:
+                offset += sizeof(int) + length + sizeof(RID);
+                break;
+            default:
+                break;
+        }
+    }
+    if (!isLeaf) {
+        if (!isSmaller) {
+            memcpy(&prevPagePointer, (char *)page+offset, sizeof(int));
+            offset += sizeof(int);
+        }
+        ixfileHandle.fileHandle.readPage(prevPagePointer-1, page);
+        offset = sizeof(bool) + sizeof(int);
+        pageId = prevPagePointer;
+        memcpy(&space, (char *)page+sizeof(bool), sizeof(int));
+    }
+    free(page);
     return 0;
 }
 
@@ -709,7 +911,7 @@ RC IndexManager::keyCompare(bool &res, const Attribute &attribute, const void* k
             if(rid1.pageNum != rid2.pageNum){
                 res = rid1.pageNum < rid2.pageNum;
             } else{
-                res = rid1.slotNum < rid2.slotNum;
+                res = rid1.slotNum <= rid2.slotNum;
             }
         }
     } else if(attribute.type==1){
@@ -722,7 +924,7 @@ RC IndexManager::keyCompare(bool &res, const Attribute &attribute, const void* k
             if(rid1.pageNum != rid2.pageNum){
                 res = rid1.pageNum < rid2.pageNum;
             } else{
-                res = rid1.slotNum < rid2.slotNum;
+                res = rid1.slotNum <= rid2.slotNum;
             }
         }
     } else if(attribute.type == 2){
@@ -748,7 +950,7 @@ RC IndexManager::keyCompare(bool &res, const Attribute &attribute, const void* k
             if(rid1.pageNum != rid2.pageNum){
                 res = rid1.pageNum < rid2.pageNum;
             } else{
-                res = rid1.slotNum < rid2.slotNum;
+                res = rid1.slotNum <= rid2.slotNum;
             }
         }
     } else{
