@@ -126,7 +126,7 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         memcpy(&victimRid.pageNum, (char*)page+offset+sizeof(int), sizeof(unsigned));
         memcpy(&victimRid.slotNum, (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
         int itemSize = sizeof(int)+2*sizeof(unsigned);
-        cout<<"delete entry: "<<victimKey<<", "<<victimRid.pageNum<<", "<<victimRid.slotNum<<endl;
+        //cout<<"delete entry: "<<victimKey<<", "<<victimRid.pageNum<<", "<<victimRid.slotNum<<endl;
         if(victimKey==*(int*)key && rid.pageNum==victimRid.pageNum && rid.slotNum==victimRid.slotNum){
             void* newPage = malloc(PAGE_SIZE);
             memset(newPage,0,PAGE_SIZE);
@@ -321,6 +321,7 @@ RC IndexManager::findVictimLeafKey(IXFileHandle &ixfileHandle, int& pageId, int&
         free(page);
         return -1;
     }
+    //cout<<pageId<<", "<<offset<<endl;
     return 0;
 }
 
@@ -353,6 +354,7 @@ RC IndexManager::findVictimKey(IXFileHandle &ixfileHandle, int& pageId, int& off
                 memcpy(key, (char *)page+offset, sizeof(int));
                 memcpy(&rid.pageNum, (char*)page+offset+sizeof(int), sizeof(unsigned));
                 memcpy(&rid.slotNum, (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
+                //if(!isLeaf) cout<<"not leaf: "<<*(int*)key<<endl;
                 rc = keyCompare(isSmaller, attribute, victimKey, key, victimRid, rid);
                 if (rc) {
                     free(page);
@@ -1705,10 +1707,12 @@ RC IndexManager::splitLeafPage(IXFileHandle& ixfileHandle, int pageId, int &newP
             splitOffset += itemSize;
         }
         memcpy((char*)key, (char*)page+offset, sizeof(int));
-        //cout<<"split: "<<*(int*)key<<endl;
         memcpy((char*)(&rid.pageNum), (char*)page+offset+sizeof(int), sizeof(unsigned));
         memcpy((char*)(&rid.slotNum), (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
-        //cout<<"split: "<<*(int*)key<<", "<<rid.pageNum<<", "<<rid.slotNum<<", "<<offset<<endl;
+        memcpy((char*)splitedPage+splitOffset, (char*)page+offset, itemSize);
+        offset += itemSize;
+        splitOffset += itemSize;
+        
         while(offset+itemSize <= PAGE_SIZE){
             memcpy((char*)newPage+newOffset, (char*)page+offset, itemSize);
             offset += itemSize;
@@ -1891,7 +1895,9 @@ RC IndexManager::splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &
         memcpy((char*)key, (char*)page+offset, sizeof(float));
         memcpy((char*)(&rid.pageNum), (char*)page+offset+sizeof(float), sizeof(unsigned));
         memcpy((char*)(&rid.slotNum), (char*)page+offset+sizeof(float)+sizeof(unsigned), sizeof(unsigned));
-
+        memcpy((char*)splitedPage+splitOffset, (char*)page+offset, itemSize);
+        offset += itemSize;
+        splitOffset += itemSize;
         //put first pageid to the new page
         memcpy((char*)newPage+newOffset, (char*)page+offset-sizeof(int), sizeof(int));
         newOffset += sizeof(int);
