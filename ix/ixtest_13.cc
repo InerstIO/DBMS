@@ -63,6 +63,9 @@ int testCase_13(const string &indexFileName, const Attribute &attribute)
 
         if (count == tested_ascii) {
             numOfTuplesTobeScanned++;
+/*cout<<i<<endl;
+indexManager->printBtree(ixfileHandle, attribute);
+cout<<"========================================"<<endl;*/
         }
     }
     
@@ -81,7 +84,6 @@ int testCase_13(const string &indexFileName, const Attribute &attribute)
         
         numOfTuplesTobeScanned++;
     }
-
     // collect counter
     // we will eyeball those numbers to see if they are reasonable.
     unsigned readPageCount = 0;
@@ -179,4 +181,3 @@ int main()
     }
 
 }
-

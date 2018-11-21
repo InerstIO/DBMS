@@ -72,14 +72,14 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
     }
 
     compVal = 5000;
-
+cout<<"finish insert"<<endl;
     // Conduct a scan
     rc = indexManager->scan(ixfileHandle1, attribute, NULL, &compVal, true, true, ix_ScanIterator1);
     assert(rc == success && "indexManager::scan() should not fail.");
 
     rc = indexManager->scan(ixfileHandle2, attribute, NULL, &compVal, true, true, ix_ScanIterator2);
     assert(rc == success && "indexManager::scan() should not fail.");
-
+cout<<"finish scan"<<endl;
     // scan & delete
     count = 0;
     while(ix_ScanIterator1.getNextEntry(rid, &key) == success)
@@ -91,6 +91,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
         }
 
         // delete entry
+cout<<"delete count: "<<count<<endl;
         rc = indexManager->deleteEntry(ixfileHandle1, attribute, &key, rid);
         assert(rc == success && "indexManager::deleteEntry() should not fail.");
 
@@ -105,7 +106,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
         cerr << count << " - Wrong entries output...failure" << endl;
         goto error_close_scan;
     }
-
+cout<<"delete finish"<<endl;
     // close scan
     rc = ix_ScanIterator1.close();
     assert(rc == success && "IX_ScanIterator::close() should not fail.");
@@ -134,7 +135,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
         rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
     }
-
+cout<<"finish insert again"<<endl;
     // scan
     compVal = 35000;
 

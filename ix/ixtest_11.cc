@@ -45,8 +45,8 @@ int testCase_11(const string &indexFileName, const Attribute &attribute){
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
         inRecordNum += 1;
-        if (inRecordNum % 200000 == 0) {
-            cerr << inRecordNum << " inserted - rid: " << rid.pageNum << " " << rid.slotNum << endl;
+        if (inRecordNum % 10000 == 0) {
+            cerr << key << " inserted - rid: " << rid.pageNum << " " << rid.slotNum << endl;
         }
     }
 
@@ -65,7 +65,7 @@ int testCase_11(const string &indexFileName, const Attribute &attribute){
             return fail;
         }
         outRecordNum += 1;
-        if (outRecordNum % 200000 == 0) {
+        if (outRecordNum % 10000 == 0) {
             cerr << outRecordNum << " scanned. " << endl;
         }
     }
@@ -92,7 +92,7 @@ int testCase_11(const string &indexFileName, const Attribute &attribute){
         assert(rc == success && "indexManager::deleteEntry() should not fail.");
 
         deletedRecordNum += 1;
-        if (deletedRecordNum % 20000 == 0) {
+        if (deletedRecordNum % 2000 == 0) {
             cerr << deletedRecordNum << " deleted. " << endl;
         }
     }
@@ -116,7 +116,7 @@ int testCase_11(const string &indexFileName, const Attribute &attribute){
             return fail;
         }
         outRecordNum += 1;
-        if (outRecordNum % 200000 == 0) {
+        if (outRecordNum % 10000 == 0) {
             cerr << outRecordNum << " scanned. " << endl;
         }
 
@@ -145,7 +145,7 @@ int testCase_11(const string &indexFileName, const Attribute &attribute){
         assert(rc == success && "indexManager::insertEntry() should not fail.");
 
         reInsertedRecordNum += 1;
-        if (reInsertedRecordNum % 20000 == 0) {
+        if (reInsertedRecordNum % 10000 == 0) {
             cerr << reInsertedRecordNum << " inserted - rid: " << rid.pageNum << " " << rid.slotNum << endl;
         }
     }

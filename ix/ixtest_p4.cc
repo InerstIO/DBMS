@@ -63,6 +63,7 @@ int testCase_p4(const string &indexFileName1, const Attribute &attribute1, const
 
         rc = indexManager->insertEntry(ixfileHandle2, attribute2, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
+if(i%2000==0) cout<<i<<endl;
     }
     
     // collect counters

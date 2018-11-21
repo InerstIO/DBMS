@@ -72,6 +72,7 @@ int testCase_10(const string &indexFileName, const Attribute &attribute)
     }
 
     // Inconsistency?
+cout<<inRidSlotNumSum<<", "<<outRidSlotNumSum<<endl;
     if (inRidSlotNumSum != outRidSlotNumSum)
     {
         cerr << "Wrong entries output... The test failed" << endl;

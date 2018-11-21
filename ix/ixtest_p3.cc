@@ -29,18 +29,18 @@ int testCase_p3(const string &indexFileName, const Attribute &attribute)
     // open the index files
     rc = indexManager->openFile(indexFileName, ixfileHandle);
     assert(rc == success && "indexManager::openFile() should not fail.");
-
+cout<<"finish open"<<endl;
     // insert entry
     for(i = 1; i <= numOfTuples; i++)
     {
         sprintf(key + 4, "%06d", i);
         rid.pageNum = i;
         rid.slotNum = i % PAGE_SIZE;
-
+if(i%2000==0) cout<<i<<endl;
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
    }
-
+cout<<"finish insert"<<endl;
     *(int*)lowKey = 6;
     sprintf(lowKey+4, "%06d", 90000);
     *(int*)highKey = 6;
@@ -65,7 +65,7 @@ int testCase_p3(const string &indexFileName, const Attribute &attribute)
         cerr << "Wrong output count! expected: 10001" << ", actual: " << count << " Failure" << endl;
         goto error_close_scan;
     }
-
+cout<<"iter finish"<<endl;
     // close scan
     rc = ix_ScanIterator.close();
     assert(rc == success && "IX_ScanIterator::close() should not fail.");
