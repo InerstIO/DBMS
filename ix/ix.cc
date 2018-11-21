@@ -459,8 +459,9 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
                 break;
             case TypeVarChar:
                 memcpy(&length, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
-                key = malloc(length);
-                memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
+                key = malloc(sizeof(int)+length);
+                memcpy(key, &length, sizeof(int));
+                memcpy((char *)key+sizeof(int), (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
                 rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
                 if (rc) {
                     free(key);
@@ -1925,9 +1926,8 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
         case TypeVarChar:
             int length;
             memcpy(&length, (char *)loadedPage+offset, sizeof(int));
-            offset += sizeof(int);
-            memcpy(key, (char *)loadedPage+offset, length);
-            offset += length;
+            memcpy(key, (char *)loadedPage+offset, sizeof(int)+length);
+            offset += sizeof(int) + length;
             break;
         default:
             break;
@@ -1983,18 +1983,33 @@ RC IX_ScanIterator::compare(bool &isSmaller, const int type, const void* key1, c
         }
         case TypeVarChar:
         {
+            char* str1 = appendNULL((char *)key1);
+            char* str2 = appendNULL((char *)key2);
+
             if (inclusive) {
-                isSmaller = strcmp((char *)key1, (char *)key2) <= 0;
+                isSmaller = strcmp(str1+4, str2+4) <= 0;
             }
             else {
-                isSmaller = strcmp((char *)key1, (char *)key2) < 0;
+                isSmaller = strcmp(str1+4, str2+4) < 0;
             }
+            delete[] str1;
+            delete[] str2;
             return 0;
         }
         default:
             break;
     }
     return -1;
+}
+
+char* IX_ScanIterator::appendNULL(char* str) {
+    int length;
+    memcpy(&length, str, sizeof(int));
+    char* output = new char[sizeof(int) + length + 1];
+    memcpy(output, str, sizeof(int) + length);
+    char end = '\0';
+    memcpy(output + sizeof(int) + length, &end, sizeof(char));
+    return output;
 }
 
 RC IX_ScanIterator::close()
