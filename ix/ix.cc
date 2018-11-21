@@ -480,6 +480,9 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
     } else if(attribute.type == 2){
         curRetKeyPtr = malloc(4+attribute.length);
     } else{
+        retPageId1 = 0;
+        retPageId2 = 0;
+        free(curRetKeyPtr);
         return -1;
     }
     if(ixfileHandle.rootNodePointer == 0){
@@ -519,6 +522,8 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
             } else{
                 retPageId1 = 0;
                 retPageId2 = 0;
+                free(curRetKeyPtr);
+                free(page);
                 return -1;
             }
                 int space;
@@ -594,6 +599,10 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                         memcpy((char*)(&ksize), (char*)page+offset+4, sizeof(int));
                         ksize += 4;
                     } else{
+                        retPageId1 = 0;
+                        retPageId2 = 0;
+                        free(curRetKeyPtr);
+                        free(page);
                         return -1;
                     }
                     void* kptr = malloc(ksize);
@@ -617,6 +626,7 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                     insertEntryHelper(attribute, ixfileHandle, key, rid, rightPage, curRetPageId1, curRetKeyPtr, curRetRid, curRetPageId2);
                 }
         }
+        free(page);
     }
 
     if(curRetPageId1>0 && curRetPageId2>0){
@@ -1147,6 +1157,7 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
         void* page = malloc(PAGE_SIZE);
         ixfileHandle.fileHandle.readPage(pageId-1, page);
         void* newPage = malloc(PAGE_SIZE);
+        memset((char*)newPage, 0, PAGE_SIZE);
         int space;
         memcpy(&space, (char*)page+1, sizeof(int));
         int offset = 9;
