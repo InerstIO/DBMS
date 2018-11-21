@@ -713,9 +713,13 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     for (unsigned i=0; i<keyVector.size() - 1; i++) {
                         cout << "\"" << keyVector.at(i) << ":";
                         cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                        char* k = keyVector.at(i);
+                        free(k);
                     }
                     cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
                     cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
+                    char* k = keyVector.at(keyVector.size() - 1);
+                    free(k);
                 }
                 break;
             }
