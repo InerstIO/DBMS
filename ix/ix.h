@@ -92,8 +92,8 @@ class IX_ScanIterator {
         
         IXFileHandle* ixfileHandle;
         int type;
-        const void *lowKey;
-        const void *highKey;
+        void* lowKey;
+        void* highKey;
         bool lowKeyInclusive;
         bool highKeyInclusive;
         void* loadedPage;
