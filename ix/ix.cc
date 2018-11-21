@@ -98,7 +98,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     void* retKey;
     int retPageId1=0;
     int retPageId2=0;
-    cout<<"rootNodePointer: "<<ixfileHandle.rootNodePointer<<endl;
+    //cout<<"rootNodePointer: "<<ixfileHandle.rootNodePointer<<endl;
     RID retRid;
     //cout<<*(int*)key<<": "<<ixfileHandle.rootNodePointer<<endl;
     return insertEntryHelper(attribute, ixfileHandle, key, rid, ixfileHandle.rootNodePointer, retPageId1, retKey, retRid, retPageId2);
@@ -486,6 +486,7 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
             } else if(attribute.type == 2){
                 memcpy((char*)(&keySize), (char*)key, sizeof(int));
                 keySize += 4;
+                //cout<<"keysize: "<<keySize<<endl;
                 insertSize = keySize+2*sizeof(unsigned);
                 pushupKeySize = attribute.length+sizeof(int);
             } else{
@@ -494,7 +495,9 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
                 int space;
                 memcpy((char*)(&space), (char*)page+1, sizeof(int));
                 if(space+insertSize <= PAGE_SIZE){
+                    //cout<<"start insert"<<endl;
                     insertLeaf(ixfileHandle, curPageId, attribute, key, rid);
+                    //cout<<"end insert"<<endl;
                     retPageId1 = 0;
                     retPageId2 = 0;
                 } else{
@@ -600,7 +603,12 @@ RC IndexManager::insertEntryHelper(const Attribute &attribute, IXFileHandle &ixf
             ixfileHandle.fileHandle.readPage(curPageId-1, page);
             int space;
             memcpy(&space, (char*)page+1, sizeof(int));
-            int itemSize = 2*sizeof(int)+2*sizeof(unsigned);
+            int itemSize = sizeof(int)+2*sizeof(unsigned);
+            if(attribute.type==0 || attribute.type==1){
+                itemSize += 4;
+            } else{
+                itemSize += attribute.length;
+            }
             if(space+itemSize > PAGE_SIZE){
                 int newPageId = 0;
                 splitInternalPage(ixfileHandle, curPageId, newPageId, curRetKeyPtr, curRetRid, attribute);
@@ -676,12 +684,22 @@ RC IndexManager::keyCompare(bool &res, const Attribute &attribute, const void* k
             }
         }
     } else if(attribute.type == 2){
-        string k1, k2;
         int size1, size2;
+        //cout<<"before compare"<<endl;
         memcpy((char*)(&size1), (char*)key1, sizeof(int));
         memcpy((char*)(&size2), (char*)key2, sizeof(int));
-        memcpy((char*)(&k1), (char*)key1+sizeof(int), size1);
-        memcpy((char*)(&k2), (char*)key2+sizeof(int), size2);
+        char* k1ptr = new char[size1+1];
+        char* k2ptr = new char[size2+1];
+        //cout<<size1<<", "<<size2<<endl;
+        memcpy(k1ptr, (char*)key1+sizeof(int), size1);
+        memcpy(k2ptr, (char*)key2+sizeof(int), size2);
+        k1ptr[size1]='\0';
+        k2ptr[size2]='\0';
+        string k1(k1ptr);
+        string k2(k2ptr);
+        //cout<<k1<<", "<<k2<<endl;
+        free(k1ptr);
+        free(k2ptr);
         if(k1 != k2){
             res = k1<k2;
         } else{
@@ -700,6 +718,7 @@ RC IndexManager::keyCompare(bool &res, const Attribute &attribute, const void* k
 
 RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, const Attribute &attribute, const void* key, 
     const RID &rid, int page1, int page2){
+    cout<<"insertInternalNode"<<endl;
     if(attribute.type == 0){
         void* page = malloc(PAGE_SIZE);
         ixfileHandle.fileHandle.readPage(pageId-1, page);
@@ -968,6 +987,7 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
             bool hasInserted = false;
             bool isFirst = true;
             while(offset<space-sizeof(int)){
+                cout<<"offset, page: "<<offset<<", "<<space<<endl;
                 int beginPageId;
                 int pageId;
                 if(!hasInserted){
@@ -976,6 +996,7 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
                     int pageNum, slotNum;
                     memcpy((char*)(&ksize), (char*)page+keyReaderPtr, sizeof(int));
                     ksize += sizeof(int);
+                    cout<<"ksize: "<<ksize<<endl;
                     void* k = malloc(ksize);
                     memcpy((char*)(k), (char*)page+keyReaderPtr, ksize);
                     keyReaderPtr += ksize;
@@ -987,11 +1008,15 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
                     RID r;
                     r.pageNum = pageNum;
                     r.slotNum = slotNum;
+                    cout<<"before key compare"<<endl;
                     RC rc = keyCompare(isSmall, attribute, key, k, rid, r);
+                    cout<<"issmall: "<<isSmall<<endl;
                     free(k);
                     if(rc!=SUCCESS) return -1;
                     if(isSmall){
+                        cout<<"isSmall"<<endl;
                         if(isFirst){
+                            cout<<"first"<<endl;
                             memcpy((char*)newPage+newOffset, (char*)(&page1), sizeof(int));
                             newOffset += sizeof(int);
                             memcpy((char*)newPage+newOffset, (char*)(key), keySize);
@@ -1009,6 +1034,7 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
                             offset = space;
                             hasInserted = true;
                         } else{
+                            cout<<"not first"<<endl;
                             //put page1, new key, then page2, then everything from old page
                             memcpy((char*)newPage+newOffset, (char*)(&page1), sizeof(int));
                             newOffset += sizeof(int);
@@ -1026,6 +1052,7 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
                             memcpy((char*)newPage+1, &newSpace, sizeof(int));
                             offset = space;
                             hasInserted = true;
+                            break;
                         }
                     } else{
                         int size = sizeof(int)+2*sizeof(unsigned)+keySize;
@@ -1035,12 +1062,12 @@ RC IndexManager::insertInternalNode(IXFileHandle& ixfileHandle, int pageId, cons
                         newOffset += size;
                     }
                 } else{
-                    ;
+                    break;
                 }
                 isFirst = false;
             }
             if(!hasInserted){
-                //cout<<"insertlast"<<endl;
+                cout<<"insertlast"<<endl;
                 memcpy((char*)newPage+newOffset, (char*)page+offset, sizeof(int));
                 newOffset += sizeof(int);
                 memcpy((char*)newPage+newOffset, (char*)key, keySize);
@@ -1182,17 +1209,20 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
         int keySize;
         memcpy((char*)&keySize, (char*)key, sizeof(int));
         keySize += sizeof(int);
+        //cout<<"before while"<<endl;
         while(offset < space){
             int ksize;
             memcpy((char*)(&ksize), (char*)page+offset, sizeof(int));
             ksize += 4;
             void* k = malloc(ksize);
-            memcpy((char*)k, (char*)page+offset, sizeof(int));
+            memcpy((char*)k, (char*)page+offset, ksize);
             RID r;
             memcpy(&(r.pageNum), (char*)page+offset+ksize, sizeof(unsigned));
             memcpy(&(r.slotNum), (char*)page+offset+ksize+sizeof(unsigned), sizeof(unsigned));
             bool isSmall;
+            //cout<<"before compare"<<endl;
             RC rc = keyCompare(isSmall, attribute, key, k, rid, r);
+            //cout<<"end compare: "<<isSmall<<endl;
             free(k);
             if(!rc==SUCCESS)   return -1;
             if(isSmall && !hasInserted){
@@ -1203,14 +1233,21 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
                 memcpy((char*)newPage+newOffset, (char*)(&rid.slotNum), sizeof(unsigned));
                 newOffset += sizeof(unsigned);
                 hasInserted = true;
-            } else{
-                int itemSize = keySize+2*sizeof(unsigned);
+                memcpy((char*)newPage+newOffset, (char*)page+offset, PAGE_SIZE-newOffset);
+                break;
+            } else if(!isSmall){
+                int itemSize = ksize+2*sizeof(unsigned);
                 memcpy((char*)newPage+newOffset, (char*)page+offset, itemSize);
                 offset += itemSize;
                 newOffset += itemSize;
             }
         }
         if(!hasInserted){
+            //cout<<"no has inserted keysize: "<<keySize<<", "<<newOffset<<endl;
+            char *str = new char[keySize-4+1];
+            memcpy(str, (char *)key + 4, keySize-4);
+            str[keySize-4] = '\0';
+            //cout<<"key: "<<str<<endl;
             memcpy((char*)newPage+newOffset, (char*)key, keySize);
             newOffset += keySize;
             memcpy((char*)newPage+newOffset, (char*)(&rid.pageNum), sizeof(unsigned));
@@ -1219,6 +1256,7 @@ RC IndexManager::insertLeaf(IXFileHandle &ixfileHandle, int pageId, const Attrib
             newOffset += sizeof(unsigned);
             hasInserted = true;
         }
+        //cout<<"after nothasinserted"<<endl;
         int itemSize = keySize+2*sizeof(unsigned);
         space += itemSize;
         memcpy((char*)newPage+1, (char*)(&space), sizeof(int));
@@ -1374,6 +1412,7 @@ RC IndexManager::splitLeafPage(IXFileHandle& ixfileHandle, int pageId, int &newP
 
 //input page to split, return newpageid, push-up key, push-up rid, push-up left page, push-up right page
 RC IndexManager::splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &newPageId, void* key, RID& rid, const Attribute &attribute){
+    cout<<"splitInternalPage"<<endl;
     void* page = malloc(PAGE_SIZE);
     void* splitedPage = malloc(PAGE_SIZE);
     void* newPage = malloc(PAGE_SIZE);
@@ -1512,6 +1551,7 @@ RC IndexManager::splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &
     free(page);
     free(splitedPage);
     free(newPage);
+    cout<<"end split internal"<<endl;
     return SUCCESS;
 }
 
