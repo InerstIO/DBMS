@@ -197,8 +197,69 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     if(!ixfileHandle.fileHandle.filefs.is_open()) return -1;
     ix_ScanIterator.ixfileHandle = &ixfileHandle;
     ix_ScanIterator.type = attribute.type;
-    ix_ScanIterator.lowKey = lowKey;
-    ix_ScanIterator.highKey = highKey;
+    
+    switch (ix_ScanIterator.type)
+    {
+        case TypeInt:
+            if (lowKey == NULL) {
+                ix_ScanIterator.lowKey = NULL;
+            }
+            else {
+                ix_ScanIterator.lowKey = new int;//TODO: delete when close()
+                memcpy(ix_ScanIterator.lowKey, lowKey, sizeof(int));
+            }
+            
+            if (highKey == NULL) {
+                ix_ScanIterator.highKey = NULL;
+            }
+            else {
+                ix_ScanIterator.highKey = new int;//TODO: delete when close()
+                memcpy(ix_ScanIterator.highKey, highKey, sizeof(int));
+            }
+            break;
+        case TypeReal:
+            if (lowKey == NULL) {
+                ix_ScanIterator.lowKey = NULL;
+            }
+            else {
+                ix_ScanIterator.lowKey = new float;//TODO: delete when close()
+                memcpy(ix_ScanIterator.lowKey, lowKey, sizeof(float));
+            }
+            
+            if (highKey == NULL) {
+                ix_ScanIterator.highKey = NULL;
+            }
+            else {
+                ix_ScanIterator.highKey = new float;//TODO: delete when close()
+                memcpy(ix_ScanIterator.highKey, highKey, sizeof(float));
+            }
+            break;
+        case TypeVarChar:
+            if (lowKey == NULL) {
+                ix_ScanIterator.lowKey = NULL;
+            }
+            else {
+                int length;
+                memcpy(&length, lowKey, sizeof(int));
+                ix_ScanIterator.lowKey = new char[sizeof(int) + length];//TODO: delete[] when close()
+                memcpy(ix_ScanIterator.lowKey, &length, sizeof(int));
+                memcpy((char *)ix_ScanIterator.lowKey + sizeof(int), (char *)lowKey + sizeof(int), length);
+            }
+            
+            if (highKey == NULL) {
+                ix_ScanIterator.highKey = NULL;
+            }
+            else {
+                int length;
+                memcpy(&length, highKey, sizeof(int));
+                ix_ScanIterator.highKey = new char[sizeof(int) + length];//TODO: delete[] when close()
+                memcpy(ix_ScanIterator.highKey, &length, sizeof(int));
+                memcpy((char *)ix_ScanIterator.highKey + sizeof(int), (char *)highKey + sizeof(int), length);
+            }
+            break;
+        default:
+            break;
+    }
     ix_ScanIterator.lowKeyInclusive = lowKeyInclusive;
     ix_ScanIterator.highKeyInclusive = highKeyInclusive;
     ix_ScanIterator.loadedPage = malloc(PAGE_SIZE);
@@ -398,8 +459,7 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
                 break;
             case TypeVarChar:
                 memcpy(&length, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
-                ix_ScanIterator.offset += sizeof(int);
-                key = malloc(sizeof(length));
+                key = malloc(length);
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
                 rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
                 if (rc) {
@@ -536,20 +596,25 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     int length;
                     memcpy(&length, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
-                    void* k = malloc(length);
+                    void* k = malloc(length+1);
                     memcpy(k, (char *)page+offset, length);
+                    char end = '\0';
+                    memcpy((char *)k+length, &end, sizeof(char));
                     offset += length;
                     keyVector.push_back((char *)k);
                     offset += sizeof(RID);
-                    free(k);
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
                 if (!keyVector.empty()) {
                     for (unsigned i=0; i<keyVector.size() - 1; i++) {
                         cout << "\"" << keyVector.at(i) << "\",";
+                        char* k = keyVector.at(i);
+                        free(k);
                     }
                     cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
+                    char* k = keyVector.at(keyVector.size() - 1);
+                    free(k);
                 }
                 break;
             }
@@ -632,8 +697,10 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     int length;
                     memcpy(&length, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
-                    void* k = malloc(length);
+                    void* k = malloc(length+1);
                     memcpy(k, (char *)page+offset, length);
+                    char end = '\0';
+                    memcpy((char *)k+length, &end, sizeof(char));
                     offset += length;
                     keyVector.push_back((char *)k);
                     memcpy(&rid, (char *)page+offset, sizeof(RID));
@@ -1932,6 +1999,25 @@ RC IX_ScanIterator::compare(bool &isSmaller, const int type, const void* key1, c
 
 RC IX_ScanIterator::close()
 {
+    switch (type)
+    {
+        case TypeVarChar:
+            if (lowKey != NULL) {
+                delete[] (char *)lowKey;
+            }
+            if (highKey != NULL) {
+                delete[] (char *)highKey;
+            }
+            break;
+        default:
+            if (lowKey != NULL) {
+                delete (int *)lowKey;
+            }
+            if (highKey != NULL) {
+                delete (int *)highKey;
+            }
+            break;
+    }
     free(loadedPage);
     return 0;
 }
