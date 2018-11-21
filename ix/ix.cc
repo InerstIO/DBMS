@@ -1770,18 +1770,33 @@ RC IX_ScanIterator::compare(bool &isSmaller, const int type, const void* key1, c
         }
         case TypeVarChar:
         {
+            char* str1 = appendNULL((char *)key1);
+            char* str2 = appendNULL((char *)key2);
+
             if (inclusive) {
-                isSmaller = strcmp((char *)key1, (char *)key2) <= 0;
+                isSmaller = strcmp(str1+4, str2+4) <= 0;
             }
             else {
-                isSmaller = strcmp((char *)key1, (char *)key2) < 0;
+                isSmaller = strcmp(str1+4, str2+4) < 0;
             }
+            delete[] str1;
+            delete[] str2;
             return 0;
         }
         default:
             break;
     }
     return -1;
+}
+
+char* IX_ScanIterator::appendNULL(char* str) {
+    int length;
+    memcpy(&length, str, sizeof(int));
+    char* output = new char[sizeof(int) + length + 1];
+    memcpy(output, str, sizeof(int) + length);
+    char end = '\0';
+    memcpy(output + sizeof(int) + length, &end, sizeof(char));
+    return output;
 }
 
 RC IX_ScanIterator::close()

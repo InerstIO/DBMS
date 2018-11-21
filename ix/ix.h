@@ -101,6 +101,8 @@ class IX_ScanIterator {
         int space;
         // return true if key1 smaller (or equal, depends on inclusive) than key2
         RC compare(bool &isSmaller, const int type, const void* key1, const void* key2, const bool inclusive);
+        // append '\0' to the end of the VarChar
+        char* appendNULL(char* str);
 };
 
 
