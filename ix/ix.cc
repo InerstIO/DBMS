@@ -395,20 +395,25 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     int length;
                     memcpy(&length, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
-                    void* k = malloc(length);
+                    void* k = malloc(length+1);
                     memcpy(k, (char *)page+offset, length);
+                    char end = '\0';
+                    memcpy((char *)k+length, &end, sizeof(char));
                     offset += length;
                     keyVector.push_back((char *)k);
                     offset += sizeof(RID);
-                    free(k);
                 }
                 memcpy(&childPageId, (char *)page+offset, sizeof(int));
                 pageVector.push_back(childPageId);
                 if (!keyVector.empty()) {
                     for (unsigned i=0; i<keyVector.size() - 1; i++) {
                         cout << "\"" << keyVector.at(i) << "\",";
+                        char* k = keyVector.at(i);
+                        free(k);
                     }
                     cout << "\"" << keyVector.at(keyVector.size() - 1) << "\"]," << endl;
+                    char* k = keyVector.at(keyVector.size() - 1);
+                    free(k);
                 }
                 break;
             }
@@ -491,8 +496,10 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     int length;
                     memcpy(&length, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
-                    void* k = malloc(length);
+                    void* k = malloc(length+1);
                     memcpy(k, (char *)page+offset, length);
+                    char end = '\0';
+                    memcpy((char *)k+length, &end, sizeof(char));
                     offset += length;
                     keyVector.push_back((char *)k);
                     memcpy(&rid, (char *)page+offset, sizeof(RID));
