@@ -72,6 +72,10 @@ class IndexManager {
         bool isLeafPage(void* page);
         // find the offset of lowKey and load the next page if current not leaf
         RC findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIterator, bool isLeaf);
+        RC findVictimLeafKey(IXFileHandle &ixfileHandle, int& pageId, int& offset, const Attribute& attribute, const void* victimKey, 
+            const RID& victimRid);
+        RC findVictimKey(IXFileHandle &ixfileHandle, int& pageId, int& offset, const Attribute& attribute, bool isLeaf, 
+            const void* victimKey, const RID& victimRid);
 };
 
 
