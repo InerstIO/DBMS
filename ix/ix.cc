@@ -707,7 +707,6 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     memcpy(&rid, (char *)page+offset, sizeof(RID));
                     offset += sizeof(RID);
                     RIDVector.push_back(rid);
-                    free(k);
                 }
                 
                 if (!keyVector.empty()) {
