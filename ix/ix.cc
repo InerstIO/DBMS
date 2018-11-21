@@ -731,16 +731,19 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     memcpy(&rid, (char *)page+offset, sizeof(RID));
                     offset += sizeof(RID);
                     RIDVector.push_back(rid);
-                    free(k);
                 }
                 
                 if (!keyVector.empty()) {
                     for (unsigned i=0; i<keyVector.size() - 1; i++) {
                         cout << "\"" << keyVector.at(i) << ":";
                         cout << "(" << RIDVector.at(i).pageNum << ", " << RIDVector.at(i).slotNum << ")\",";
+                        char* k = keyVector.at(i);
+                        free(k);
                     }
                     cout << "\"" << keyVector.at(keyVector.size() - 1) << ":";
                     cout << "(" << RIDVector.at(keyVector.size() - 1).pageNum << ", " << RIDVector.at(keyVector.size() - 1).slotNum << ")\"";
+                    char* k = keyVector.at(keyVector.size() - 1);
+                    free(k);
                 }
                 break;
             }
@@ -1985,7 +1988,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
     if (offset > space) {
         return -1;
     }
-    else if (offset == space)
+    while (offset == space)
     {
         int pageNum;
         memcpy(&pageNum, (char *)loadedPage+sizeof(bool)+sizeof(int), sizeof(int));
