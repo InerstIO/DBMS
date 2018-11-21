@@ -257,7 +257,6 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
                 break;
             case TypeVarChar:
                 memcpy(&length, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
-                ix_ScanIterator.offset += sizeof(int);
                 key = malloc(length);
                 memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
                 rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
