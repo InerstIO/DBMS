@@ -257,8 +257,9 @@ RC IndexManager::findKey(IXFileHandle &ixfileHandle, IX_ScanIterator &ix_ScanIte
                 break;
             case TypeVarChar:
                 memcpy(&length, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset, sizeof(int));
-                key = malloc(length);
-                memcpy(key, (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
+                key = malloc(sizeof(int)+length);
+                memcpy(key, &length, sizeof(int));
+                memcpy((char *)key+sizeof(int), (char *)ix_ScanIterator.loadedPage+ix_ScanIterator.offset+sizeof(int), length);
                 rc = ix_ScanIterator.compare(isSmaller, type, ix_ScanIterator.lowKey, key, ix_ScanIterator.lowKeyInclusive);
                 if (rc) {
                     free(key);
@@ -1712,9 +1713,8 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
         case TypeVarChar:
             int length;
             memcpy(&length, (char *)loadedPage+offset, sizeof(int));
-            offset += sizeof(int);
-            memcpy(key, (char *)loadedPage+offset, length);
-            offset += length;
+            memcpy(key, (char *)loadedPage+offset, sizeof(int)+length);
+            offset += sizeof(int) + length;
             break;
         default:
             break;
