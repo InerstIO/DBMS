@@ -622,6 +622,7 @@ void IndexManager::dfsPrint(IXFileHandle &ixfileHandle, const Attribute &attribu
                     memcpy(&length, (char *)page+offset, sizeof(int));
                     offset += sizeof(int);
                     void* k = malloc(length+1);
+                    memset(k,0,length+1);
                     memcpy(k, (char *)page+offset, length);
                     char end = '\0';
                     memcpy((char *)k+length, &end, sizeof(char));
@@ -1826,11 +1827,6 @@ RC IndexManager::splitLeafPage(IXFileHandle& ixfileHandle, int pageId, int &newP
 //input page to split, return newpageid, push-up key, push-up rid, push-up left page, push-up right page
 RC IndexManager::splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &newPageId, void* key, RID& rid, const Attribute &attribute){
     //cout<<"splitInternalPage"<<endl;
-    if(attribute.type==0 || attribute.type==1){
-        key = malloc(4);
-    } else{
-        key = malloc(4+attribute.length);
-    }
     void* page = malloc(PAGE_SIZE);
     void* splitedPage = malloc(PAGE_SIZE);
     void* newPage = malloc(PAGE_SIZE);
@@ -1861,7 +1857,8 @@ RC IndexManager::splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &
         memcpy((char*)key, (char*)page+offset, sizeof(int));
         memcpy((char*)(&rid.pageNum), (char*)page+offset+sizeof(int), sizeof(unsigned));
         memcpy((char*)(&rid.slotNum), (char*)page+offset+sizeof(int)+sizeof(unsigned), sizeof(unsigned));
-
+        offset += itemSize;
+        splitOffset += itemSize;
         //put first pageid to the new page
         memcpy((char*)newPage+newOffset, (char*)page+offset-sizeof(int), sizeof(int));
         newOffset += sizeof(int);
@@ -1929,7 +1926,7 @@ RC IndexManager::splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &
         memcpy((char*)splitedPage+splitOffset, (char*)page+offset, sizeof(int));
         offset += sizeof(int);
         splitOffset += sizeof(int);
-        while(offset <= space/2){
+        while(offset <= PAGE_SIZE/2){
             int ksize;
             memcpy((char*)(&ksize), (char*)page+offset, sizeof(int));
             ksize += sizeof(int);
@@ -1942,9 +1939,11 @@ RC IndexManager::splitInternalPage(IXFileHandle& ixfileHandle, int pageId, int &
         memcpy((char*)(&ksize), (char*)page+offset, sizeof(int));
         ksize += sizeof(int);
         int itemSize = ksize+sizeof(int)+2*sizeof(unsigned);
-        memcpy((char*)key, (char*)page+offset, itemSize);
+        memcpy((char*)key, (char*)page+offset, ksize);
         memcpy((char*)(&rid.pageNum), (char*)page+offset+sizeof(float), sizeof(unsigned));
         memcpy((char*)(&rid.slotNum), (char*)page+offset+sizeof(float)+sizeof(unsigned), sizeof(unsigned));
+        offset += itemSize;
+        splitOffset += itemSize;
 
         //put first pageid to the new page
         memcpy((char*)newPage+newOffset, (char*)page+offset-sizeof(int), sizeof(int));
