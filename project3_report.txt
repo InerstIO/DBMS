@@ -10,6 +10,12 @@ gcc version : 5.4.0 20160609
 
 2. Meta-data page in an index file
 - Show your meta-data page of an index design if you have any. 
+The first page is a hidden page, which contains four int: the three counters and pageid for the root page.
+After that, the first byte in each page is an isLeaf variable to help us know whether this is a leaf page or internal node page. And the following value stored is an int that represents occupied space in this page.
+If it is leaf page, we use another in to store its next page. 0 means it is the end. The structure of a leaf page looks like the following:
+isLeaf|space|nextPageId|key|rid.pageNum|rid.slotNum|key|rid.pageNum|rid.slotNum......
+If is a leaf node, we then store its children pageid, key, and rid, which looks like the following:
+isLeaf|space|pageId||key|rid.pageNum|rid.slotNum|pageId|key|rid.pageNum|rid.slotNum|pageId....
 
 
 3. Index Entry Format
