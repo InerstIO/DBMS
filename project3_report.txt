@@ -1,11 +1,11 @@
 1. Basic information
-Team number (e.g., 01) : 
-#1 Student ID : 
-#1 Student Name : 
-#2 Student ID : 
-#2 Student Name : 
-OS (bit) :
-gcc version :
+Team number (e.g., 01) : 23
+#1 Student ID : 20689831
+#1 Student Name : Yuxuan Hao
+#2 Student ID : 25245625
+#2 Student Name : Yu Feng
+OS (bit) : Ubuntu 16.04.3 x64
+gcc version : 5.4.0 20160609
 
 
 2. Meta-data page in an index file
@@ -14,21 +14,42 @@ gcc version :
 
 3. Index Entry Format
 - Show your index entry design (structure). 
+The entry consists of the key and the rid - (key, rid).
+If the data type is TypeInt/TypeReal, the key is 4 byte. If the data type is TypeVarChar, the first 4 bytes
+indicates the length of the string, followed by the string.
 
 
 4. Page Format
 - Show your internal-page (non-leaf node) design.
+--------------------------------------------------------------------------------------------------------
+|isLeaf|usedSpace|pagePointer1|(key1, rid1)|pagePointer2|(key2, rid2)|...|(keyN-1, ridN-1)|pagePointerN|
+--------------------------------------------------------------------------------------------------------
+The first byte is a bool isLeaf indicating whether the page is a leaf-page. After that an int is used to 
+record the total number of bytes used in this page. We have pagePointers which are integers indicating the
+child pages's pageNum. The pageNum starts from 1, since we use 0 to indicate non-exist page.
+keys are placed between the pagePointers.
 
 - Show your leaf-page (leaf node) design.
-
+------------------------------------------------------------------------------
+|isLeaf|usedSpace|nextLeafPage|(key1, rid1)|(key2, rid2)|...|(keyN-1, ridN-1)|
+------------------------------------------------------------------------------
+The first byte is a bool isLeaf indicating whether the page is a leaf-page. After that an int is used to 
+record the total number of bytes used in this page. We have a int which is the pageNum of the leaf on the 
+right of this leaf-page. The pageNum starts from 1, since we use 0 to indicate non-exist page. If it is 0,
+we will know it is already the right most leaf. keys and rids are placed after that.
 
 5. Implementation Detail
 - Have you added your own source file (.cc or .h)?
+No.
 
 - Have you implemented non-lazy deletion? Choose Yes or No: 
+No.
 
 - Have you implemented duplicated key handling that can span multiple pages? Choose Yes or No: 
   If yes, please explain briefly how you have implemented this feature.
+Yes. We implemented it by adding rid into the index entry, and write a compare function to compare the index entries.
+If the keys are the same we compare the rids. Since we use the composite key design, there will be no real 
+duplicates in our index.
 
 - Other implementation details:
 
