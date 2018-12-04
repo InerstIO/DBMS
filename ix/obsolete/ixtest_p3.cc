@@ -15,7 +15,7 @@ int testCase_p3(const string &indexFileName, const Attribute &attribute)
     IXFileHandle ixfileHandle;
     IX_ScanIterator ix_ScanIterator;
     char key[100];
-    int numOfTuples = 150000;
+    int numOfTuples = 100000;
     int i = 0;
     *(int*)key = 6;
     int count = 0;
@@ -44,10 +44,10 @@ int testCase_p3(const string &indexFileName, const Attribute &attribute)
     *(int*)lowKey = 6;
     sprintf(lowKey+4, "%06d", 90000);
     *(int*)highKey = 6;
-    sprintf(highKey+4, "%06d", 130000);
+    sprintf(highKey+4, "%06d", 100000);
 
     // Conduct a scan
-    rc = indexManager->scan(ixfileHandle, attribute, lowKey, highKey, false, true, ix_ScanIterator);
+    rc = indexManager->scan(ixfileHandle, attribute, lowKey, highKey, true, true, ix_ScanIterator);
     assert(rc == success && "indexManager::scan() should not fail.");
 
     //iterate
@@ -61,8 +61,8 @@ int testCase_p3(const string &indexFileName, const Attribute &attribute)
         count++;
     }
 
-    if (count != 40000) {
-        cerr << "Wrong output count! expected: 40000" << ", actual: " << count << " Failure" << endl;
+    if (count != 10001) {
+        cerr << "Wrong output count! expected: 10001" << ", actual: " << count << " Failure" << endl;
         goto error_close_scan;
     }
 

@@ -27,7 +27,7 @@ int testCase_p4(const string &indexFileName1, const Attribute &attribute1, const
     unsigned  appendPage2 = 0;
 
     char key[100];
-    int numOfTuples = 70000;
+    int numOfTuples = 50000;
     int i = 0;
     *(int*)key = 5;
     int count = 0;
@@ -84,9 +84,9 @@ int testCase_p4(const string &indexFileName1, const Attribute &attribute1, const
     }
 
     *(int*)lowKey = 5;
-    sprintf(lowKey+4, "%05d", 40801);
+    sprintf(lowKey+4, "%05d", 30801);
     *(int*)highKey = 5;
-    sprintf(highKey+4, "%05d", 40900);
+    sprintf(highKey+4, "%05d", 30900);
 
     rc = indexManager->scan(ixfileHandle1, attribute1, lowKey, highKey, true, true, ix_ScanIterator1);
     assert(rc == success && "indexManager::scan() should not fail.");
@@ -102,6 +102,8 @@ int testCase_p4(const string &indexFileName1, const Attribute &attribute1, const
             cerr << "Wrong entries output...failure" << endl;
             goto error_close_index;
         }
+        //key[9] = '\0';
+        //printf("output: %s\n", key+4);
         count++;
     }
     if (count != 100) {
