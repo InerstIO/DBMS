@@ -13,7 +13,7 @@ void prepareKeyAndRid(const unsigned count, const unsigned i, char* key, RID &ri
     *(int *)key = count;
     for(unsigned j = 0; j < count; j++)
     {
-        key[4 + j] = 'a' + i;
+        key[4 + j] = 'a' + i - 1;
     }
     rid.pageNum = i;
     rid.slotNum = i;
@@ -28,7 +28,7 @@ int testCase_p5(const string &indexFileName,
     RID rid;
     IXFileHandle ixfileHandle;
     IX_ScanIterator ix_ScanIterator;
-    unsigned numOfTuples = 16;
+    unsigned numOfTuples = 7;
     char key[PAGE_SIZE];
     unsigned count = attribute.length;
 
@@ -41,22 +41,16 @@ int testCase_p5(const string &indexFileName,
 
     // insert entry
     unsigned i = 1;
-    for(; i <= numOfTuples/2; i++)
+    for(; i <= numOfTuples; i++)
     {
-        prepareKeyAndRid(count, i, key, rid);
-
-        rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
-        assert(rc == success && "indexManager::insertEntry() should not fail.");
-        
-        prepareKeyAndRid(count, i+numOfTuples/2, key, rid);
+        prepareKeyAndRid(count, i * 10, key, rid);
 
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
     }
 
-    // insert the 18th
-    i = 17;
-    prepareKeyAndRid(count, i++, key, rid);
+    // insert the 8th
+    prepareKeyAndRid(count, i++ * 10 , key, rid);
     rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
     assert(rc == success && "indexManager::insertEntry() should not fail.");
     
@@ -64,8 +58,8 @@ int testCase_p5(const string &indexFileName,
     // depend on the design of your root
     indexManager->printBtree(ixfileHandle, attribute);
 
-    // insert the 19th
-    prepareKeyAndRid(count, i++, key, rid);
+    // insert the 9th
+    prepareKeyAndRid(count, i++ * 10, key, rid);
     rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
     assert(rc == success && "indexManager::insertEntry() should not fail.");
     
@@ -104,9 +98,9 @@ int testCase_p5(const string &indexFileName,
     cerr << "After Iteration - R:" << readPageCountScan << " W:" << writePageCountScan << " A:" << appendPageCountScan << endl;
 
     unsigned roughLeafReadCount = readPageCountScan - readPageCountInsert;
-    // If the B+Tree index is 3 level: 3 I/O + 6 scan I/O per leaf at maximum  = 9 
-    // If the B+Tree index is 2 level: 2 I/O + 6 scan I/O per entry at maximum  = 8 
-    if (roughLeafReadCount > 9){
+    // If the B+Tree index is 3 level: 3 I/O + 9 scan I/O per entry at maximum  = 12 
+    // If the B+Tree index is 2 level: 2 I/O + 9 scan I/O per entry at maximum  = 11 
+    if (roughLeafReadCount > 12){
         cerr << "Too many read I/Os for scan: " << roughLeafReadCount << ", the leaf nodes should be linked." << endl;
         cerr << "Check the print out B+ Tree to validate the pages" << endl;
         indexManager->printBtree(ixfileHandle, attribute);
@@ -139,7 +133,7 @@ int main()
     const string indexEmpNameFileName = "private_empname_idx";
 
     Attribute attrEmpName;
-    attrEmpName.length = PAGE_SIZE / 5;  // each node could only have 4 children
+    attrEmpName.length = PAGE_SIZE / 4;  // each node could only have 3 children
     attrEmpName.name = "EmpName";
     attrEmpName.type = TypeVarChar;
 

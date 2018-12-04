@@ -20,10 +20,10 @@ int testCase_p1(const string &indexFileName1, const string &indexFileName2, cons
     IXFileHandle ixfileHandle2;
     IX_ScanIterator ix_ScanIterator1;
     IX_ScanIterator ix_ScanIterator2;
-    unsigned numOfTuples = 3000;
+    unsigned numOfTuples = 2000;
     float key;
     float key2;
-    float compVal = 3003;
+    float compVal = 6500;
     int inRidPageNumSum = 0;
     int outRidPageNumSum = 0;
 
@@ -41,76 +41,56 @@ int testCase_p1(const string &indexFileName1, const string &indexFileName2, cons
     rc = indexManager->openFile(indexFileName2, ixfileHandle2);
     assert(rc == success && "indexManager::openFile() should not fail.");
 
-    // insert entry to index1
-    for(unsigned i = numOfTuples; i > 0; i--)
+    // insert entry
+    for(unsigned i = 1; i <= numOfTuples; i++)
     {
-        key = (float)i + 162.7;
+        key = (float)i + 87.6;
         rid.pageNum = i;
         rid.slotNum = i;
 
         rc = indexManager->insertEntry(ixfileHandle1, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
 
-        if (key > compVal){
+        rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
+        assert(rc == success && "indexManager::insertEntry() should not fail.");
+
+        if (key < compVal){
             inRidPageNumSum += rid.pageNum;
         }
     }
-    // insert entry to index2
-    for(unsigned i = 1; i <= numOfTuples; i++)
-    {
-        key = (float)i + 162.7;
-        rid.pageNum = i;
-        rid.slotNum = i;
 
-        rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
-        assert(rc == success && "indexManager::insertEntry() should not fail.");
-    }
-
-    // insert more entries to index1
-    for (unsigned i = numOfTuples + 4000; i >= 4000; i--)
+    // insert more entries
+    for (unsigned i = 6000; i <= numOfTuples + 6000; i++)
     {
-        key = (float)i + 162.7;
+        key = (float)i + 87.6;
         rid.pageNum = i;
-        rid.slotNum = 1;
+        rid.slotNum = i-(unsigned)500;
 
         // insert entry
         rc = indexManager->insertEntry(ixfileHandle1, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
 
-        if (key > compVal)
+        // insert entry
+        rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
+        assert(rc == success && "indexManager::insertEntry() should not fail.");
+
+        if (key < compVal)
         {
             inRidPageNumSum += rid.pageNum;
         }
     }
-    
-    // insert more entries to index2
-    for (unsigned i = 4000; i <= numOfTuples + 4000; i++)
-    {
-        key = (float)i + 162.7;
-        rid.pageNum = i;
-        rid.slotNum = 1;
-
-        // insert entry
-        rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
-        assert(rc == success && "indexManager::insertEntry() should not fail.");
-    }
 
     // Conduct a scan
-    rc = indexManager->scan(ixfileHandle1, attribute, &compVal, NULL, false, true, ix_ScanIterator1);
+    rc = indexManager->scan(ixfileHandle1, attribute, NULL, &compVal, true, false, ix_ScanIterator1);
     assert(rc == success && "indexManager::scan() should not fail.");
 
     // Conduct a scan
-    rc = indexManager->scan(ixfileHandle2, attribute, &compVal, NULL, false, true, ix_ScanIterator2);
+    rc = indexManager->scan(ixfileHandle2, attribute, NULL, &compVal, true, false, ix_ScanIterator2);
     assert(rc == success && "indexManager::scan() should not fail.");
 
     int returnedCount = 0;
     while (ix_ScanIterator1.getNextEntry(rid, &key) == success)
     {
-    	if(returnedCount == 0)
-    	{
-    		cerr << rid.pageNum << endl;
-    		cerr << key << endl;
-    	}
         returnedCount++;
 
         if (ix_ScanIterator2.getNextEntry(rid2, &key2) != success){
@@ -173,17 +153,17 @@ error_close_scan: //close scan
 
 int main(){
     indexManager = IndexManager::instance();
-    const string indexHeightFileName1 = "private_weight_idx1";
-    const string indexHeightFileName2 = "private_weight_idx2";
-    Attribute attrWeight;
-    attrWeight.length = 4;
-    attrWeight.name = "Weight";
-    attrWeight.type = TypeReal;
+    const string indexHeightFileName1 = "private_height_idx1";
+    const string indexHeightFileName2 = "private_height_idx2";
+    Attribute attrHeight;
+    attrHeight.length = 4;
+    attrHeight.name = "Height";
+    attrHeight.type = TypeReal;
 
-    indexManager->destroyFile("private_weight_idx1");
-    indexManager->destroyFile("private_weight_idx2");
+    indexManager->destroyFile("private_height_idx1");
+    indexManager->destroyFile("private_height_idx2");
 
-    int rcmain = testCase_p1(indexHeightFileName1, indexHeightFileName2, attrWeight);
+    int rcmain = testCase_p1(indexHeightFileName1, indexHeightFileName2, attrHeight);
 
     if (rcmain == success) {
         cerr << "***** IX Test Private Case 1 finished. The result will be examined. *****" << endl;

@@ -23,7 +23,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
     IXFileHandle ixfileHandle2;
     IX_ScanIterator ix_ScanIterator1;
     IX_ScanIterator ix_ScanIterator2;
-    int compVal, compVal2;
+    int compVal;
     int numOfTuples;
     int A[20000];
     int B[30000];
@@ -56,7 +56,6 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
 
     // Randomly shuffle the entries
     random_shuffle(A, A+numOfTuples);
-    compVal = 10000;
 
     // Insert entries
     for(int i = 0; i < numOfTuples; i++)
@@ -67,19 +66,18 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
 
         rc = indexManager->insertEntry(ixfileHandle1, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
-        
-        if(key >= compVal)
-        {
-        	rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
-        	assert(rc == success && "indexManager::insertEntry() should not fail.");
-        }
+
+        rc = indexManager->insertEntry(ixfileHandle2, attribute, &key, rid);
+        assert(rc == success && "indexManager::insertEntry() should not fail.");
     }
 
+    compVal = 5000;
+
     // Conduct a scan
-    rc = indexManager->scan(ixfileHandle1, attribute, &compVal, NULL, true, true, ix_ScanIterator1);
+    rc = indexManager->scan(ixfileHandle1, attribute, NULL, &compVal, true, true, ix_ScanIterator1);
     assert(rc == success && "indexManager::scan() should not fail.");
 
-    rc = indexManager->scan(ixfileHandle2, attribute, &compVal, NULL, true, true, ix_ScanIterator2);
+    rc = indexManager->scan(ixfileHandle2, attribute, NULL, &compVal, true, true, ix_ScanIterator2);
     assert(rc == success && "indexManager::scan() should not fail.");
 
     // scan & delete
@@ -88,8 +86,7 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
     {
         if (ix_ScanIterator2.getNextEntry(rid2, &key2) != success 
                 || rid.pageNum != rid2.pageNum) {
-            cerr << "1Wrong entries output...failure " << endl;
-            cerr << count;
+            cerr << "Wrong entries output...failure" << endl;
             goto error_close_scan;
         }
 
@@ -103,9 +100,9 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
 
         count++;
     }
-    if (count != 10000)
+    if (count != 5001)
     {
-        cerr << count << " - 2Wrong entries output...failure" << endl;
+        cerr << count << " - Wrong entries output...failure" << endl;
         goto error_close_scan;
     }
 
@@ -139,32 +136,31 @@ int testCase_p2(const string &indexFileName1, const string &indexFileName2,
     }
 
     // scan
-    compVal = 20001;
-    compVal2 = 35000;
-    
-    rc = indexManager->scan(ixfileHandle1, attribute,  &compVal, &compVal2, true, true, ix_ScanIterator1);
+    compVal = 35000;
+
+    rc = indexManager->scan(ixfileHandle1, attribute, NULL, &compVal, true, true, ix_ScanIterator1);
     assert(rc == success && "indexManager::scan() should not fail.");
 
-    rc = indexManager->scan(ixfileHandle2, attribute,  &compVal, &compVal2, true, true, ix_ScanIterator2);
+    rc = indexManager->scan(ixfileHandle2, attribute, NULL, &compVal, true, true, ix_ScanIterator2);
     assert(rc == success && "indexManager::scan() should not fail.");
 
     count = 0;
     while(ix_ScanIterator1.getNextEntry(rid, &key) == success)
     {
         if (ix_ScanIterator2.getNextEntry(rid2, &key) != success) {
-            cerr << "3Wrong entries output...failure" << endl;
+            cerr << "Wrong entries output...failure" << endl;
             goto error_close_scan;
         }
         if(rid.pageNum > 20000 && B[rid.pageNum-20001] > 35000)
         {
-            cerr << "4Wrong entries output...failure" << endl;
+            cerr << "Wrong entries output...failure" << endl;
             goto error_close_scan;
         }
         count ++;
     }
-    if (count != 15000)
+    if (count != 30000)
     {
-        cerr << count << " - 5Wrong entries output...failure" << endl;
+        cerr << count << " - Wrong entries output...failure" << endl;
         goto error_close_scan;
     }
 

@@ -18,7 +18,7 @@ int testCase_p6(const string &indexFileName, const Attribute &attribute)
     RID rid;
     IXFileHandle ixfileHandle;
     IX_ScanIterator ix_ScanIterator;
-    unsigned numOfTuples = 121;
+    unsigned numOfTuples = 90;
     char key[100];
     *(int*)key = 5;
     int count = 0;
@@ -41,15 +41,15 @@ int testCase_p6(const string &indexFileName, const Attribute &attribute)
     // insert entries
     for(unsigned i = 0; i < numOfTuples; i++)
     {
-        sprintf(key + 4, "%05d", i % 4);
+        sprintf(key + 4, "%05d", i % 3);
 
         rid.pageNum = i;
-        rid.slotNum = i % 4;
+        rid.slotNum = i % 3;
 
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
 
-        if (i % 4 == 1) {
+        if (i % 3 == 1) {
             inRidPageNumSum += rid.pageNum;
         }
     }
