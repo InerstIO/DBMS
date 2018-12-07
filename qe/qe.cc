@@ -93,3 +93,119 @@ RC Filter::getNextTuple(void *data) {
     }
     return QE_EOF;
 }
+
+bool Filter::compare(CompOp op, AttrType type) {
+    bool result = false;
+    switch (type)
+    {
+        case TypeInt:
+        {
+            int leftVal;
+            int rightVal;
+            memcpy(&leftVal, lhsValue, sizeof(int));
+            memcpy(&rightVal, rhsValue, sizeof(int));
+            switch (op)
+            {
+                case EQ_OP:
+                    result = leftVal == rightVal;
+                    break;
+                case LT_OP:
+                    result = leftVal < rightVal;
+                    break;
+                case LE_OP:
+                    result = leftVal <= rightVal;
+                    break;
+                case GT_OP:
+                    result = leftVal > rightVal;
+                    break;
+                case GE_OP:
+                    result = leftVal >= rightVal;
+                    break;
+                case NE_OP:
+                    result = leftVal != rightVal;
+                    break;
+                case NO_OP:
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
+        case TypeReal:
+        {
+            float leftVal;
+            float rightVal;
+            memcpy(&leftVal, lhsValue, sizeof(float));
+            memcpy(&rightVal, rhsValue, sizeof(float));
+            switch (op)
+            {
+                case EQ_OP:
+                    result = leftVal == rightVal;
+                    break;
+                case LT_OP:
+                    result = leftVal < rightVal;
+                    break;
+                case LE_OP:
+                    result = leftVal <= rightVal;
+                    break;
+                case GT_OP:
+                    result = leftVal > rightVal;
+                    break;
+                case GE_OP:
+                    result = leftVal >= rightVal;
+                    break;
+                case NE_OP:
+                    result = leftVal != rightVal;
+                    break;
+                case NO_OP:
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
+        case TypeVarChar:
+        {
+            int leftLength;
+            int rightLength;
+            memcpy(&leftLength, lhsValue, sizeof(int));
+            memcpy(&rightLength, rhsValue, sizeof(int));
+            char* leftVal = new char[leftLength];
+            char* rightVal = new char[rightLength];
+            memcpy(leftVal, (char *)lhsValue + sizeof(int), leftLength);
+            memcpy(rightVal, (char *)rhsValue + sizeof(int), rightLength);
+            switch (op)
+            {
+                case EQ_OP:
+                    result = strcmp(leftVal, rightVal) == 0;
+                    break;
+                case LT_OP:
+                    result = strcmp(leftVal, rightVal) < 0;
+                    break;
+                case LE_OP:
+                    result = strcmp(leftVal, rightVal) <= 0;
+                    break;
+                case GT_OP:
+                    result = strcmp(leftVal, rightVal) > 0;
+                    break;
+                case GE_OP:
+                    result = strcmp(leftVal, rightVal) >= 0;
+                    break;
+                case NE_OP:
+                    result = strcmp(leftVal, rightVal) != 0;
+                    break;
+                case NO_OP:
+                    break;
+                default:
+                    break;
+            }
+            delete[] leftVal;
+            delete[] rightVal;
+            break;
+        }
+        default:
+            break;
+    }
+    
+    return result;
+}
