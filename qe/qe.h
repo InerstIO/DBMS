@@ -196,7 +196,7 @@ class Filter : public Iterator {
         Filter(Iterator *input,               // Iterator of input R
                const Condition &condition     // Selection condition
         );
-        ~Filter(){};
+        ~Filter();
 
         Iterator *input;
         Condition condition;

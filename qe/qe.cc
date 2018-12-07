@@ -5,8 +5,13 @@ Filter::Filter(Iterator* input, const Condition &condition) {
     this->input = input;
     this->condition = condition;
     input->getAttributes(attrs);
-    lhsValue = malloc(PAGE_SIZE); //TODO: free at ~Filter()
-    rhsValue = malloc(PAGE_SIZE); //TODO: free at ~Filter()
+    lhsValue = malloc(PAGE_SIZE);
+    rhsValue = malloc(PAGE_SIZE);
+}
+
+Filter::~Filter() {
+    free(lhsValue);
+    free(rhsValue);
 }
 
 // ... the rest of your implementations go here
