@@ -224,3 +224,82 @@ void Filter::getAttributes(vector<Attribute> &attrs) const {
     attrs.clear();
     input->getAttributes(attrs);
 }
+
+Project::Project(Iterator *input, const vector<string> &attrNames) {
+    this->input = input;
+    this->attrNames = attrNames;
+    input->getAttributes(getAttrs);
+    getData = malloc(PAGE_SIZE);
+    attrNotFound = false;
+
+    map<string, int> attrsMap;
+    
+    for(unsigned i = 0; i < getAttrs.size(); i++)
+    {
+        attrsMap.insert(pair<string, int>(getAttrs[i].name, i));
+    }
+    
+    map<string, int>::iterator it;
+    
+    for(unsigned i = 0; i < attrNames.size(); i++)
+    {
+        it = attrsMap.find(attrNames[i]);
+        if (it == attrsMap.end()) {
+            attrNotFound = true;
+        }
+        attrsIdx.push_back(it->second);
+    }
+    // getAttributes after attrsIdx is initialized
+    getAttributes(wantAttrs);
+}
+
+Project::~Project() {
+    free(getData);
+}
+
+RC Project::getNextTuple(void *data) {
+    if (attrNotFound) {
+        return -1;
+    }
+
+    if (input->getNextTuple(getData) != QE_EOF) {
+        void* wantRecord = malloc(PAGE_SIZE);
+        int wantLength = 0;
+        short num = wantAttrs.size();
+        memcpy(wantRecord, &num, sizeof(short));
+        wantLength += sizeof(short) + 2 * wantAttrs.size();
+        int ptrPosition = sizeof(short);
+
+        unsigned short length = 0;
+        char *record = (char *)data2record(getData, getAttrs, length);
+        for (unsigned i = 0; i < attrsIdx.size(); i++)
+        {
+            unsigned short startIdx;
+            unsigned short endIdx;
+            memcpy(&startIdx, record + sizeof(int) + 2 * attrsIdx[i], sizeof(short));
+            if (attrsIdx[i] == getAttrs.size() - 1) {
+                endIdx = length;
+            }
+            else {
+                memcpy(&endIdx, record + sizeof(int) + 2 * (attrsIdx[i] + 1), sizeof(short));
+            }
+            memcpy((char *)wantRecord + wantLength, record + startIdx, endIdx - startIdx);
+            memcpy((char *)wantRecord + ptrPosition, &wantLength, sizeof(short));
+            wantLength += endIdx - startIdx;
+            ptrPosition += sizeof(short);
+        }
+        record2data(wantRecord, wantAttrs, data);
+        free(wantRecord);
+        return 0;
+    }
+    
+    return QE_EOF;
+}
+
+void Project::getAttributes(vector<Attribute> &attrs) const {
+    attrs.clear();
+    for(unsigned i = 0; i < attrsIdx.size(); i++)
+    {
+        attrs.push_back(getAttrs[attrsIdx[i]]);
+    }
+}
