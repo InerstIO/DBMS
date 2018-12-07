@@ -205,9 +205,9 @@ class Filter : public Iterator {
         void* rhsValue;
 
         // Return the compare result of lhsValue and rhsValue
-        bool compare(CompOp, AttrType);
+        bool compare(CompOp op, AttrType type);
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
         void getAttributes(vector<Attribute> &attrs) const{};
 };
