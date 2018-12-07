@@ -36,12 +36,17 @@ RC Filter::getNextTuple(void *data) {
     while(input->getNextTuple(data) != QE_EOF) {
         int offset = 0;
         int nullIndSize = ceil((double)attrs.size()/(double)8);
+        vector<bitset<8>> nullBits = nullIndicators(nullIndSize, data);
         offset += nullIndSize;
         bool findLeft = false;
         bool findRight = !condition.bRhsIsAttr;
         
         for(unsigned i = 0; i < attrs.size(); i++)
         {
+            // if null attribute
+            if(!nullBits[i/8][7-i%8]) {
+                continue;
+            }
             if (attrs.at(i).name == condition.lhsAttr || attrs.at(i).name == condition.rhsAttr) {
                 
                 switch (attrs[i].type)
