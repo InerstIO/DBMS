@@ -209,3 +209,8 @@ bool Filter::compare(CompOp op, AttrType type) {
     
     return result;
 }
+
+void Filter::getAttributes(vector<Attribute> &attrs) const {
+    attrs.clear();
+    input->getAttributes(attrs);
+}

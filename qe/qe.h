@@ -209,7 +209,7 @@ class Filter : public Iterator {
 
         RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 
