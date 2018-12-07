@@ -198,6 +198,15 @@ class Filter : public Iterator {
         );
         ~Filter(){};
 
+        Iterator *input;
+        Condition condition;
+        vector<Attribute> attrs;
+        void* lhsValue;
+        void* rhsValue;
+
+        // Return the compare result of lhsValue and rhsValue
+        bool compare(CompOp, AttrType);
+
         RC getNextTuple(void *data) {return QE_EOF;};
         // For attribute in vector<Attribute>, name it as rel.attr
         void getAttributes(vector<Attribute> &attrs) const{};
