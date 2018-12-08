@@ -263,7 +263,7 @@ RC Project::getNextTuple(void *data) {
     }
 
     if (input->getNextTuple(getData) != QE_EOF) {
-        void* wantRecord = malloc(PAGE_SIZE);
+        char* wantRecord = new char[PAGE_SIZE];
         int wantLength = 0;
         short num = wantAttrs.size();
         memcpy(wantRecord, &num, sizeof(short));
@@ -289,7 +289,8 @@ RC Project::getNextTuple(void *data) {
             ptrPosition += sizeof(short);
         }
         record2data(wantRecord, wantAttrs, data);
-        free(wantRecord);
+        delete[] wantRecord;
+        delete[] record;
         return 0;
     }
     
