@@ -5,18 +5,14 @@ Filter::Filter(Iterator* input, const Condition &condition) {
     this->input = input;
     this->condition = condition;
     input->getAttributes(attrs);
-    lhsValue = malloc(PAGE_SIZE);
-    rhsValue = malloc(PAGE_SIZE);
-}
-
-Filter::~Filter() {
-    free(lhsValue);
-    free(rhsValue);
 }
 
 // ... the rest of your implementations go here
 
 RC Filter::getNextTuple(void *data) {
+    char* lhsValue = new char[PAGE_SIZE];
+    char* rhsValue = new char[PAGE_SIZE];
+
     if (!condition.bRhsIsAttr) {
         // get rhsValue
         switch (condition.rhsValue.type)
@@ -79,7 +75,9 @@ RC Filter::getNextTuple(void *data) {
                 }
 
                 if (findLeft && findRight) {
-                    if (compare(condition.op, attrs[i].type)) {
+                    if (compare(condition.op, attrs[i].type, lhsValue, rhsValue)) {
+                        delete[] lhsValue;
+                        delete[] rhsValue;
                         return 0;
                     }
                     break;
@@ -101,10 +99,12 @@ RC Filter::getNextTuple(void *data) {
             }
         }
     }
+    delete[] lhsValue;
+    delete[] rhsValue;
     return QE_EOF;
 }
 
-bool Filter::compare(CompOp op, AttrType type) {
+bool Filter::compare(CompOp op, AttrType type, char* lhsValue, char* rhsValue) {
     bool result = false;
     switch (type)
     {

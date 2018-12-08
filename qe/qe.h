@@ -196,16 +196,14 @@ class Filter : public Iterator {
         Filter(Iterator *input,               // Iterator of input R
                const Condition &condition     // Selection condition
         );
-        ~Filter();
+        ~Filter() {};
 
         Iterator *input;
         Condition condition;
         vector<Attribute> attrs;
-        void* lhsValue;
-        void* rhsValue;
 
         // Return the compare result of lhsValue and rhsValue
-        bool compare(CompOp op, AttrType type);
+        bool compare(CompOp op, AttrType type, char* lhsValue, char* rhsValue);
 
         RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
