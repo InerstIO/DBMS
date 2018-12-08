@@ -1,4 +1,5 @@
-
+#include <algorithm>
+#include <limits>
 #include "qe.h"
 
 Filter::Filter(Iterator* input, const Condition &condition) {
@@ -303,4 +304,121 @@ void Project::getAttributes(vector<Attribute> &attrs) const {
     {
         attrs.push_back(getAttrs[attrsIdx[i]]);
     }
+}
+
+Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op) {
+    this->input = input;
+    this->aggAttr = aggAttr;
+    this->op = op;
+    input->getAttributes(getAttrs);
+    attrId = find(getAttrs.begin(), getAttrs.end(), aggAttr) - getAttrs.begin();
+}
+
+RC Aggregate::getNextTuple(void *data) {
+    char* getData = new char[PAGE_SIZE];
+    float min = numeric_limits<float>::infinity();
+    float max = -min;
+    float sum = 0;
+    float count = 0;
+    void* num = malloc(sizeof(int));
+    
+    while(input->getNextTuple(getData) != QE_EOF){
+        unsigned short length = 0;
+        char *record = (char *)data2record(getData, getAttrs, length);
+        unsigned short startIdx;
+        memcpy(&startIdx, record + sizeof(int) + 2 * attrId, sizeof(short));
+        memcpy(num, record + startIdx, sizeof(int));
+        delete[] record;
+        float val;
+        if (aggAttr.type == TypeInt) {
+            val = (float)*(int *)num;
+        }
+        else {
+            val = *(float *)num;
+        }
+        
+        switch (op)
+        {
+            case MAX:
+                if (val > max) {
+                    max = val;
+                }
+                break;
+            case MIN:
+                if (val < min) {
+                    min = val;
+                }
+                break;
+            case COUNT:
+                count++;
+                break;
+            case SUM:
+                sum += val;
+                break;
+            case AVG:
+                count++;
+                sum += val;
+                break;
+            default:
+                break;
+        }
+    }
+    float res;
+    switch (op)
+    {
+        case MAX:
+            res = max;
+            break;
+        case MIN:
+            res = min;
+            break;
+        case COUNT:
+            res = count;
+            break;
+        case SUM:
+            res = sum;
+            break;
+        case AVG:
+            res = sum / count;
+            break;
+        default:
+            break;
+    }
+
+    memcpy(data, &res, sizeof(float));
+    
+    delete[] getData;
+    free(num);
+    return QE_EOF;
+}
+
+void Aggregate::getAttributes(vector<Attribute> &attrs) const {
+    attrs.clear();
+    Attribute attr;
+    attr.type = TypeReal;
+    attr.length = sizeof(float);
+    string aggOp;
+    
+    switch (op)
+    {
+        case MAX:
+            aggOp = "MAX";
+            break;
+        case MIN:
+            aggOp = "MIN";
+            break;
+        case COUNT:
+            aggOp = "COUNT";
+            break;
+        case SUM:
+            aggOp = "SUM";
+            break;
+        case AVG:
+            aggOp = "AVG";
+            break;
+        default:
+            break;
+    }
+    attr.name = aggOp + "(" + aggAttr.name + ")";
+    attrs.push_back(attr);
 }
