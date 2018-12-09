@@ -438,9 +438,9 @@ void BNLJoin::buildMap() {
     }
 }
 
-RC BNLJoin::getNextTuple(void *data) {
+/*RC BNLJoin::getNextTuple(void *data) {
     
-}
+}*/
 
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op) {
     this->input = input;
