@@ -315,7 +315,7 @@ BNLJoin::BNLJoin(Iterator *leftIn, TableScan *rightIn, const Condition &conditio
     this->condition = condition;
     this->numPages = numPages;
     leftIn->getAttributes(leftAttrs);
-    leftAttrId = find(leftAttrs.begin(), leftAttrs.end(), condition.lhsAttr) - leftAttrs.begin();
+    //leftAttrId = find(leftAttrs.begin(), leftAttrs.end(), condition.lhsAttr) - leftAttrs.begin();
 }
 
 int BNLJoin::dataLength(const void* data, const vector<Attribute>& recordDescriptor) {
@@ -450,7 +450,7 @@ Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op) {
     this->aggAttr = aggAttr;
     this->op = op;
     input->getAttributes(getAttrs);
-    attrId = find(getAttrs.begin(), getAttrs.end(), aggAttr) - getAttrs.begin();
+    //attrId = find(getAttrs.begin(), getAttrs.end(), aggAttr) - getAttrs.begin();
 }
 
 RC Aggregate::getNextTuple(void *data) {
@@ -560,4 +560,143 @@ void Aggregate::getAttributes(vector<Attribute> &attrs) const {
     }
     attr.name = aggOp + "(" + aggAttr.name + ")";
     attrs.push_back(attr);
+}
+
+INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition){
+	this->leftIn = leftIn;
+	this->rightIn = rightIn;
+	this->condition = condition;
+	leftIn->getAttributes(leftAttrs);
+	rightIn->getAttributes(rightAttrs);
+}
+
+void INLJoin::getAttributes(vector<Attribute> &attrs) const{
+	for(int i=0;i<leftAttrs.size();i++){
+		Attribute attr = leftAttrs[i];
+		attrs.push_back(attr);
+	}
+	for(int i=0;i<rightAttrs.size();i++){
+		Attribute attr = rightAttrs[i];
+		attrs.push_back(attr);
+	}
+}
+
+RC INLJoin::getNextTuple(void *data){
+	void* leftData = malloc(4000);
+	memset((char*)leftData, 0, 4000);
+	void* rightData = malloc(4000);
+	memset((char*)rightData, 0, 4000);
+	while(leftIn->getNextTuple(leftData) != QE_EOF){
+		unsigned short length = 0;
+		void* leftRecord = data2record(leftData, leftAttrs, length);
+		string targetAttrName;
+		targetAttrName = condition.lhsAttr;
+		void* targetData = malloc(4000);
+		memset((char*)targetData,0,4000);
+		readAttributeFromRecord(leftRecord, length, leftAttrs, targetAttrName, targetData);
+		cout<<"targetData: "<<*(int*)((char*)targetData+1)<<endl;
+		rightIn->setIterator(targetData, targetData, true, true);
+		while(rightIn->getNextTuple(rightData) != QE_EOF){
+			vector<char> nullBits(ceil((leftAttrs.size()+rightAttrs.size())/8.0), 0);
+			int i = 0;
+			for(int j=0;j<leftAttrs.size();j++){
+				char nullByte = *((char*)leftData+j/8);
+				bitset<8> curBit(nullByte);
+				nullBits[i/8] += curBit[j%8]<<(i%8);
+				i++;
+			}
+			for(int j=0;j<rightAttrs.size();j++){
+				char nullByte = *((char*)rightData+j/8);
+				bitset<8> curBit(nullByte);
+				nullBits[i/8] += curBit[j%8]<<(i%8);
+				i++;
+			}
+			int offset = 0;
+			int leftOffset = 0;
+			for(int i=0;i<nullBits.size();i++){
+				memcpy((char*)data+offset, &(nullBits[i]), 1);
+				offset++;
+			}
+			for(i=0;i<leftAttrs.size();i++){
+				if(leftAttrs[i].type == TypeVarChar){
+					int l = leftAttrs[i].length;
+					memcpy((char*)data+offset, &l, sizeof(int));
+					offset += 4;
+				}
+				memcpy((char*)data+offset, (char*)leftData+(int)ceil(leftAttrs.size()/8.0)+leftOffset, leftAttrs[i].length);
+				offset += leftAttrs[i].length;
+				leftOffset += leftAttrs[i].length;
+			}
+			int rightOffset = 0;
+			for(i=0;i<rightAttrs.size();i++){
+				if(rightAttrs[i].type == TypeVarChar){
+					int l = rightAttrs[i].length;
+					memcpy((char*)data+offset, &l, sizeof(int));
+					offset += 4;
+				}
+				memcpy((char*)data+offset, (char*)rightData+(int)ceil(rightAttrs.size()/8.0)+rightOffset, rightAttrs[i].length);
+				offset += rightAttrs[i].length;
+				rightOffset += rightAttrs[i].length;
+			}
+			memset((char*)rightData, 0, 4000);
+		}
+		free(targetData);
+	}
+	free(leftData);
+	free(rightData);
+	return QE_EOF;
+}
+
+RC readAttributeFromRecord(const void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
+    unsigned i;
+    short base = sizeof(short)*recordDescriptor.size()+4-1;
+    short startAddr = sizeof(short)*recordDescriptor.size()+4;
+    short endAddr = startAddr-1;
+    bool isNull = false;
+    for(i = 0; i < recordDescriptor.size(); i++)
+    {
+        short pointer;
+        memcpy(&pointer, (char*)record+i*sizeof(short)+4, sizeof(short));
+                //cout<<pointer<<", ";
+        if (recordDescriptor[i].name == attributeName) {
+        	cout<<recordDescriptor[i].name<<", "<<attributeName<<endl;
+            if(pointer == -1){
+                isNull = true;
+            } else{
+                startAddr = endAddr+1;
+                endAddr = pointer+base;
+               // cout<<startAddr<<"--"<<base<<"+"<<pointer<<endl;
+            }
+            break;
+        } else{
+            if(pointer != -1){
+                startAddr = endAddr+1;
+                endAddr = pointer+base;
+            }
+        }
+    }
+    //cout<<endl;
+    if (i == recordDescriptor.size()) {
+        return -1;
+    }
+    
+    char nullIndicator;
+    if(isNull){
+        nullIndicator = 255;
+    } else{
+        nullIndicator = 0;
+    }
+    ((char*)data)[0] = nullIndicator;
+    if(recordDescriptor[i].type == 2){
+        length = endAddr-startAddr+1;
+        //cout<<length<<endl;
+        memcpy((char*)data+1, &length, sizeof(int));
+        memcpy((char*)data+5, (char*)record+startAddr, length);
+    } else{
+        length = 4;
+        memcpy((char*)data+1, (char*)record+startAddr, 4);
+        cout<<"startAddr: "<<startAddr<<endl;
+        cout<<*(int*)((char*)record+startAddr)<<endl;
+    }
+    return 0;
 }
