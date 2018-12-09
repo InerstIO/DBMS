@@ -41,7 +41,7 @@ RC Filter::getNextTuple(void *data) {
         for(unsigned i = 0; i < attrs.size(); i++)
         {
             // if null attribute
-            if(!nullBits[i/8][7-i%8]) {
+            if(nullBits[i/8][7-i%8]) {
                 continue;
             }
             if (attrs.at(i).name == condition.lhsAttr || attrs.at(i).name == condition.rhsAttr) {
