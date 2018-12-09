@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <queue>
+#include <deque>
 
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
@@ -253,22 +254,25 @@ class BNLJoin : public Iterator {
         TableScan *rightIn;
         Condition condition;
         unsigned numPages;
-        map<int, DataDir> intMap;
-        map<float, DataDir> floatMap;
-        map<string, DataDir> stringMap;
-        DataDir leftData;
-        DataDir leftNextData;
-        DataDir rightData;
-        DataDir rightNextData;
+        map<int, deque<void *>> intMap;
+        map<float, deque<void *>> floatMap;
+        map<string, deque<void *>> stringMap;
+        queue<void *> leftData;
+        queue<void *> leftNextData;
+        queue<void *> rightData;
+        queue<void *> rightNextData;
+        deque<void *> outputBuffer;
         vector<Attribute> leftAttrs;
+        vector<Attribute> rightAttrs;
+        vector<Attribute> wantAttr;
         int leftAttrId;
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
         void getAttributes(vector<Attribute> &attrs) const{};
         // Return the length of data
         int dataLength(const void* data, const vector<Attribute>& recordDescriptor);
-        RC loadPages(Iterator *input, DataDir dataDir, DataDir nextData, int maxLen, const vector<Attribute> &attrs);
+        RC loadPages(Iterator *input, queue<void *> curData, queue<void *> nextData, int maxLen, const vector<Attribute> &attrs);
         // Use leftData to build hash map
         void buildMap();
 };

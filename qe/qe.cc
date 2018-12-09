@@ -319,7 +319,12 @@ BNLJoin::BNLJoin(Iterator *leftIn, TableScan *rightIn, const Condition &conditio
     this->condition = condition;
     this->numPages = numPages;
     leftIn->getAttributes(leftAttrs);
-    leftAttrId = find(leftAttrs.begin(), leftAttrs.end(), condition.lhsAttr) - leftAttrs.begin();
+    string attrName = condition.lhsAttr;
+    leftAttrId = find_if(leftAttrs.begin(), leftAttrs.end(), [attrName] (const Attribute& attr) {
+                            return attr.name == attrName;
+                        }) - leftAttrs.begin();
+    rightIn->getAttributes(rightAttrs);
+    getAttributes(wantAttr);
 }
 
 int BNLJoin::dataLength(const void* data, const vector<Attribute>& recordDescriptor) {
@@ -342,112 +347,232 @@ int BNLJoin::dataLength(const void* data, const vector<Attribute>& recordDescrip
     return dataPos;
 }
 
-RC BNLJoin::loadPages(Iterator *input, DataDir dataDir, DataDir nextData, int maxLen, const vector<Attribute> &attrs) {
-    if (nextData.data.size() > 0) {
-        dataDir.data.push(nextData.data.front());
-        dataDir.length.push(nextData.length.front());
-        nextData.data.pop();
-        nextData.length.pop();
+RC BNLJoin::loadPages(Iterator *input, queue<void *> curData, queue<void *> nextData, int maxLen, const vector<Attribute> &attrs) {
+    queue<void *>().swap(curData); // clear curData
+    if (!nextData.empty()) {
+        curData.push(nextData.front());
+        nextData.pop();
     }
     int curLen = 0;
     
-    void* data = malloc(PAGE_SIZE);
+    void* data = malloc(PAGE_SIZE); // TODO: free at appropiate time
     while(input->getNextTuple(data) != QE_EOF){
         int len = dataLength(data, attrs);
         curLen += len;
         if (curLen > maxLen) {
-            nextData.data.push(data);
-            nextData.length.push(len);
+            nextData.push(data);
             free(data);
             return 0;
         }
-        dataDir.data.push(data);
-        dataDir.length.push(len);
+        curData.push(data);
     }
-    free(data);
     return QE_EOF;
 }
 
 void BNLJoin::buildMap() {
-    while(leftData.data.size() > 0){
-        void* data = leftData.data.front();
-        leftData.data.pop();
-        int len = leftData.length.front();
-        leftData.length.pop();
+    while(leftData.size() > 0){
+        void* data = leftData.front();
+        leftData.pop();
         unsigned short length = 0;
-        void* record = data2record(data, leftAttrs, length);
+        char* record = (char *)data2record(data, leftAttrs, length);
         switch (leftAttrs[leftAttrId].type)
         {
             case TypeInt:
             {
-                short offset;
-                memcpy(&offset, (char *)record + sizeof(int) + sizeof(short) * leftAttrId, sizeof(short));
-                int val;
-                memcpy(&val, (char *)record + offset, sizeof(int));
-                if (intMap.find(val) == intMap.end()) {
-                    DataDir dataDir;
-                    dataDir.data.push(data);
-                    dataDir.length.push(len);
-                    intMap[val] = dataDir;
+                unsigned short startIdx;
+                
+                if (leftAttrId == 0) {
+                    startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
                 }
                 else {
-                    intMap[val].data.push(data);
-                    intMap[val].length.push(len);
+                    unsigned short offset;
+                    memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
+                    startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
                 }
+
+                int val;
+                memcpy(&val, record + startIdx, sizeof(int));
+                intMap[val].push_back(data);
                 break;
             }
                 
             case TypeReal:
             {
-                short offset;
-                memcpy(&offset, (char *)record + sizeof(int) + sizeof(short) * leftAttrId, sizeof(short));
-                float val;
-                memcpy(&val, (char *)record + offset, sizeof(float));
-                if (floatMap.find(val) == floatMap.end()) {
-                    DataDir dataDir;
-                    dataDir.data.push(data);
-                    dataDir.length.push(len);
-                    floatMap[val] = dataDir;
+                unsigned short startIdx;
+                
+                if (leftAttrId == 0) {
+                    startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
                 }
                 else {
-                    floatMap[val].data.push(data);
-                    floatMap[val].length.push(len);
+                    unsigned short offset;
+                    memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
+                    startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
                 }
+
+                float val;
+                memcpy(&val, record + startIdx, sizeof(float));
+                floatMap[val].push_back(data);
                 break;
             }
                 
             case TypeVarChar:
             {
-                short offset;
-                memcpy(&offset, (char *)record + sizeof(int) + sizeof(short) * leftAttrId, sizeof(short));
-                int l;
-                memcpy(&l, (char *)record + offset, sizeof(int));
-                char* val = new char[PAGE_SIZE]; //TODO: delete[]
-                memcpy(&val, (char *)record + offset + sizeof(int), l);
-                string str(val, l);
-
-                if (stringMap.find(str) == stringMap.end()) {
-                    DataDir dataDir;
-                    dataDir.data.push(data);
-                    dataDir.length.push(len);
-                    stringMap[str] = dataDir;
+                unsigned short startIdx;
+                
+                if (leftAttrId == 0) {
+                    startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
                 }
                 else {
-                    stringMap[str].data.push(data);
-                    stringMap[str].length.push(len);
+                    unsigned short offset;
+                    memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
+                    startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
                 }
+
+                int l;
+                memcpy(&l, record + startIdx, sizeof(int));
+                char* val = new char[PAGE_SIZE];
+                memcpy(&val, record + startIdx + sizeof(int), l);
+                string str(val, l);
+                stringMap[str].push_back(data);
+
+                delete[] val;
                 break;
             }
                 
             default:
                 break;
         }
+        delete[] record;
     }
 }
 
-/*RC BNLJoin::getNextTuple(void *data) {
+RC BNLJoin::getNextTuple(void *data) {
+    /*
+    if (outputBuffer not empty) {
+        pop outputBuffer
+        return 0
+    }
+
+    while (load left pages != QE_EOF) {
+        while (load right page != QE_EOF) {
+            build map
+            while (rightData not empty) {
+                pop rightData
+                check in map
+                append to outputBuffer
+            }
+        }
+        if (outputBuffer not empty) {
+            pop outputBuffer
+            return 0
+        }
+    }
+    return QE_EOF
+    */
+
+    if (!outputBuffer.empty()) {
+        void* front = outputBuffer.front();
+        int len = dataLength(front, wantAttr);
+        memcpy(data, front, len);
+        outputBuffer.pop_front();
+        free(front);
+        return 0;
+    }
+
     
-}*/
+    while(loadPages(leftIn, leftData, leftNextData, numPages * PAGE_SIZE, leftAttrs) != QE_EOF){
+        
+        while(loadPages(rightIn, rightData, rightNextData, PAGE_SIZE, rightAttrs) != QE_EOF){
+            buildMap();
+            while(!rightData.empty()){
+                void* front = rightData.front(); //TODO: free
+                rightData.pop();
+                unsigned short length = 0;
+                char* record = (char *)data2record(front, leftAttrs, length);
+                switch (leftAttrs[leftAttrId].type)
+                {
+                    case TypeInt:
+                    {
+                        unsigned short startIdx;
+                        
+                        if (leftAttrId == 0) {
+                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
+                        }
+                        else {
+                            unsigned short offset;
+                            memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
+                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
+                        }
+
+                        int val;
+                        memcpy(&val, record + startIdx, sizeof(int));
+                        deque<void *>::iterator it = outputBuffer.end();
+                        outputBuffer.insert(it, intMap[val].begin(), intMap[val].end());
+                        break;
+                    }
+                        
+                    case TypeReal:
+                    {
+                        unsigned short startIdx;
+                        
+                        if (leftAttrId == 0) {
+                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
+                        }
+                        else {
+                            unsigned short offset;
+                            memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
+                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
+                        }
+
+                        float val;
+                        memcpy(&val, record + startIdx, sizeof(float));
+                        deque<void *>::iterator it = outputBuffer.end();
+                        outputBuffer.insert(it, floatMap[val].begin(), floatMap[val].end());
+                        break;
+                    }
+                        
+                    case TypeVarChar:
+                    {
+                        unsigned short startIdx;
+                        
+                        if (leftAttrId == 0) {
+                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
+                        }
+                        else {
+                            unsigned short offset;
+                            memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
+                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
+                        }
+
+                        int l;
+                        memcpy(&l, record + startIdx, sizeof(int));
+                        char* val = new char[PAGE_SIZE];
+                        memcpy(&val, record + startIdx + sizeof(int), l);
+                        string str(val, l);
+                        deque<void *>::iterator it = outputBuffer.end();
+                        outputBuffer.insert(it, stringMap[str].begin(), stringMap[str].end());
+
+                        delete[] val;
+                        break;
+                    }
+                        
+                    default:
+                        break;
+                }
+                delete[] record;
+            }
+        }
+        if (!outputBuffer.empty()) {
+            void* front = outputBuffer.front();
+            int len = dataLength(front, wantAttr);
+            memcpy(data, front, len);
+            outputBuffer.pop_front();
+            free(front);
+            return 0;
+        }
+    }
+    return QE_EOF;
+}
 
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op) {
     this->input = input;
