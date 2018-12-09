@@ -621,7 +621,7 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
         memcpy((char*)key, (char*)data+1, 3999);
         rc = indexManager->insertEntry(ixfileHandle, targetAttr, key, rid);
         if(rc != SUCCESS) return rc;
-        //cout<<"insert entry: "<<indexFileName<<": "<<i++<<endl;
+        cout<<"insert entry: "<<indexFileName<<", "<<targetAttr.name<<": "<<i++<<": "<<*(float*)key<<endl;
         memset(key,0,4000);
         memset(data,0,4000);
     }

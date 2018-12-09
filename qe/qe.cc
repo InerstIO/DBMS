@@ -608,17 +608,44 @@ RC INLJoin::getNextTuple(void *data){
 	memset((char*)leftData, 0, 4000);
 	void* rightData = malloc(4000);
 	memset((char*)rightData, 0, 4000);
+	//rightIn->setIterator(NULL, NULL, false, false);
 	while(leftIn->getNextTuple(leftData) != QE_EOF){
 		unsigned short length = 0;
-		void* leftRecord = data2record(leftData, leftAttrs, length);
+		//void* leftRecord = data2record(leftData, leftAttrs, length);
 		string targetAttrName;
 		targetAttrName = condition.lhsAttr;
+		//targetAttrName = targetAttrName.substr(targetAttrName.find(".")+1);
+		//cout<<targetAttrName<<endl;
 		void* targetData = malloc(4000);
 		memset((char*)targetData,0,4000);
-		readAttributeFromRecord(leftRecord, length, leftAttrs, targetAttrName, targetData);
-		cout<<"targetData: "<<*(int*)((char*)targetData+1)<<endl;
+		//readAttributeFromRecord(leftRecord, length, leftAttrs, targetAttrName, targetData);
+
+		//get target data, not handle null case
+		int offset = ceil(leftAttrs.size()/8.0);
+		for(int i=0;i<leftAttrs.size();i++){
+			if(leftAttrs[i].name == targetAttrName){
+				if(leftAttrs[i].type == 2){
+					int l = 0;
+					memcpy(&l, (char*)leftData+offset, 4);
+					memcpy(targetData, (char*)leftData+offset, 4+l);
+				} else{
+					memcpy(targetData, (char*)leftData+offset, 4);
+				}
+				break;
+			} else{
+				if(leftAttrs[i].type == 2){
+					int l = 0;
+					memcpy(&l, (char*)leftData+offset, 4);
+					offset = offset+4+l;
+				} else{
+					offset += 4;
+				}
+			}
+		}
+		//cout<<"targetData: "<<*(float*)((char*)targetData)<<endl;
 		rightIn->setIterator(targetData, targetData, true, true);
 		while(rightIn->getNextTuple(rightData) != QE_EOF){
+			//cout<<"right"<<endl;
 			vector<char> nullBits(ceil((leftAttrs.size()+rightAttrs.size())/8.0), 0);
 			int i = 0;
 			for(int j=0;j<leftAttrs.size();j++){
@@ -661,6 +688,7 @@ RC INLJoin::getNextTuple(void *data){
 				rightOffset += rightAttrs[i].length;
 			}
 			memset((char*)rightData, 0, 4000);
+			return SUCCESS;
 		}
 		free(targetData);
 	}
@@ -681,7 +709,7 @@ RC readAttributeFromRecord(const void* record, unsigned short length, const vect
         memcpy(&pointer, (char*)record+i*sizeof(short)+4, sizeof(short));
                 //cout<<pointer<<", ";
         if (recordDescriptor[i].name == attributeName) {
-        	cout<<recordDescriptor[i].name<<", "<<attributeName<<endl;
+        	//cout<<recordDescriptor[i].name<<", "<<attributeName<<endl;
             if(pointer == -1){
                 isNull = true;
             } else{
@@ -717,8 +745,8 @@ RC readAttributeFromRecord(const void* record, unsigned short length, const vect
     } else{
         length = 4;
         memcpy((char*)data+1, (char*)record+startAddr, 4);
-        cout<<"startAddr: "<<startAddr<<endl;
-        cout<<*(int*)((char*)record+startAddr)<<endl;
+        //cout<<"startAddr: "<<startAddr<<endl;
+        //cout<<*(int*)((char*)record+startAddr)<<endl;
     }
     return 0;
 }
