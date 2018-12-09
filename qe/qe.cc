@@ -181,10 +181,13 @@ bool Filter::compare(CompOp op, AttrType type, char* lhsValue, char* rhsValue) {
             int rightLength;
             memcpy(&leftLength, lhsValue, sizeof(int));
             memcpy(&rightLength, rhsValue, sizeof(int));
-            char* leftVal = new char[leftLength];
-            char* rightVal = new char[rightLength];
+            char* leftVal = new char[leftLength + 1];
+            char* rightVal = new char[rightLength + 1];
             memcpy(leftVal, (char *)lhsValue + sizeof(int), leftLength);
             memcpy(rightVal, (char *)rhsValue + sizeof(int), rightLength);
+            char end = '\0';
+            memcpy(leftVal + leftLength, &end, sizeof(char));
+            memcpy(rightVal + rightLength, &end, sizeof(char));
             switch (op)
             {
                 case EQ_OP:
