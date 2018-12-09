@@ -8,6 +8,7 @@
 #include <map>
 
 #include "../rbf/rbfm.h"
+#include "../ix/ix.h"
 
 using namespace std;
 
@@ -32,10 +33,13 @@ class RM_IndexScanIterator {
  public:
   RM_IndexScanIterator() {};  	// Constructor
   ~RM_IndexScanIterator() {}; 	// Destructor
-
+  IX_ScanIterator ix_ScanIterator;
+  RelationManager* rm;
+  FileHandle fileHandle;
+  string tableName;
   // "key" follows the same format as in IndexManager::insertEntry()
-  RC getNextEntry(RID &rid, void *key) {return RM_EOF;};  	// Get next matching entry
-  RC close() {return -1;};             			// Terminate index scan
+  RC getNextEntry(RID &rid, void *key);  	// Get next matching entry
+  RC close();             			// Terminate index scan
 };
 
 
@@ -108,10 +112,15 @@ private:
     RecordBasedFileManager* rbfm;
     vector<Attribute> tableAttr;
     vector<Attribute> columnAttr;
+    IndexManager* indexManager = IndexManager::instance();
 
     RC generateTableRecord(int tableId, string tableName, string fileName, void* data, int& length);
     RC generateColumnRecord(int tableId, string columnName, int columnType, int columnLength, int columnPos, void* data, int& length);
     RC insertTupleHelper(const string &tableName, vector<Attribute>& attributes, const void* data, RID& rid);
+    
+    RC hasIndex(const string& tableName, const string& columnName, bool& result);
+    RC getTableId(const string& tableName, int& tableId);
+    RC setIndex(const string& tableName, const string& columnName, bool hasIx);
 };
 
 #endif
