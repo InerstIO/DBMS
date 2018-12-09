@@ -326,7 +326,7 @@ class Aggregate : public Iterator {
                   Attribute aggAttr,           // The attribute over which we are computing an aggregate
                   Attribute groupAttr,         // The attribute over which we are grouping the tuples
                   AggregateOp op              // Aggregate operation
-        );
+        ){};
         ~Aggregate(){};
 
         Iterator *input;
