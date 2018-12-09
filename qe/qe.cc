@@ -604,10 +604,10 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const{
 }
 
 RC INLJoin::getNextTuple(void *data){
-	void* leftData = malloc(4000);
-	memset((char*)leftData, 0, 4000);
-	void* rightData = malloc(4000);
-	memset((char*)rightData, 0, 4000);
+	void* leftData = malloc(PAGE_SIZE);
+	memset((char*)leftData, 0, PAGE_SIZE);
+	void* rightData = malloc(PAGE_SIZE);
+	memset((char*)rightData, 0, PAGE_SIZE);
 	//rightIn->setIterator(NULL, NULL, false, false);
 	while(leftIn->getNextTuple(leftData) != QE_EOF){
 		unsigned short length = 0;
@@ -616,13 +616,18 @@ RC INLJoin::getNextTuple(void *data){
 		targetAttrName = condition.lhsAttr;
 		//targetAttrName = targetAttrName.substr(targetAttrName.find(".")+1);
 		//cout<<targetAttrName<<endl;
-		void* targetData = malloc(4000);
-		memset((char*)targetData,0,4000);
+		void* targetData = malloc(PAGE_SIZE);
+		memset((char*)targetData,0,PAGE_SIZE);
 		//readAttributeFromRecord(leftRecord, length, leftAttrs, targetAttrName, targetData);
 
-		//get target data, not handle null case
+		//get target data
+		vector<bitset<8>> nullBytes;
 		int offset = ceil(leftAttrs.size()/8.0);
+		for(int i=0;i<offset;i++){
+			nullBytes.push_back(bitset<8>((char*)leftData+i));
+		}
 		for(int i=0;i<leftAttrs.size();i++){
+			if(nullBytes[i/8][i%8] == 1) continue;
 			if(leftAttrs[i].name == targetAttrName){
 				if(leftAttrs[i].type == 2){
 					int l = 0;
@@ -687,7 +692,7 @@ RC INLJoin::getNextTuple(void *data){
 				offset += rightAttrs[i].length;
 				rightOffset += rightAttrs[i].length;
 			}
-			memset((char*)rightData, 0, 4000);
+			memset((char*)rightData, 0, PAGE_SIZE);
 			return SUCCESS;
 		}
 		free(targetData);
@@ -695,58 +700,4 @@ RC INLJoin::getNextTuple(void *data){
 	free(leftData);
 	free(rightData);
 	return QE_EOF;
-}
-
-RC readAttributeFromRecord(const void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data) {
-    unsigned i;
-    short base = sizeof(short)*recordDescriptor.size()+4-1;
-    short startAddr = sizeof(short)*recordDescriptor.size()+4;
-    short endAddr = startAddr-1;
-    bool isNull = false;
-    for(i = 0; i < recordDescriptor.size(); i++)
-    {
-        short pointer;
-        memcpy(&pointer, (char*)record+i*sizeof(short)+4, sizeof(short));
-                //cout<<pointer<<", ";
-        if (recordDescriptor[i].name == attributeName) {
-        	//cout<<recordDescriptor[i].name<<", "<<attributeName<<endl;
-            if(pointer == -1){
-                isNull = true;
-            } else{
-                startAddr = endAddr+1;
-                endAddr = pointer+base;
-               // cout<<startAddr<<"--"<<base<<"+"<<pointer<<endl;
-            }
-            break;
-        } else{
-            if(pointer != -1){
-                startAddr = endAddr+1;
-                endAddr = pointer+base;
-            }
-        }
-    }
-    //cout<<endl;
-    if (i == recordDescriptor.size()) {
-        return -1;
-    }
-    
-    char nullIndicator;
-    if(isNull){
-        nullIndicator = 255;
-    } else{
-        nullIndicator = 0;
-    }
-    ((char*)data)[0] = nullIndicator;
-    if(recordDescriptor[i].type == 2){
-        length = endAddr-startAddr+1;
-        //cout<<length<<endl;
-        memcpy((char*)data+1, &length, sizeof(int));
-        memcpy((char*)data+5, (char*)record+startAddr, length);
-    } else{
-        length = 4;
-        memcpy((char*)data+1, (char*)record+startAddr, 4);
-        //cout<<"startAddr: "<<startAddr<<endl;
-        //cout<<*(int*)((char*)record+startAddr)<<endl;
-    }
-    return 0;
 }

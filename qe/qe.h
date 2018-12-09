@@ -341,6 +341,4 @@ class Aggregate : public Iterator {
         // output attrname = "MAX(rel.attr)"
         void getAttributes(vector<Attribute> &attrs) const;
 };
-//void* data2record(const void* data, const vector<Attribute>& recordDescriptor, unsigned short& length);
-RC readAttributeFromRecord(const void* record, unsigned short length, const vector<Attribute> &recordDescriptor, const string &attributeName, void *data);
 #endif
