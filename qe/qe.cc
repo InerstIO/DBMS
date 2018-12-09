@@ -269,10 +269,10 @@ RC Project::getNextTuple(void *data) {
     if (input->getNextTuple(getData) != QE_EOF) {
         char* wantRecord = new char[PAGE_SIZE];
         int wantLength = 0;
-        short num = wantAttrs.size();
-        memcpy(wantRecord, &num, sizeof(short));
-        wantLength += sizeof(short) + 2 * wantAttrs.size();
-        int ptrPosition = sizeof(short);
+        int num = wantAttrs.size();
+        memcpy(wantRecord, &num, sizeof(int));
+        wantLength += sizeof(int) + sizeof(short) * wantAttrs.size();
+        int ptrPosition = sizeof(int);
 
         unsigned short length = 0;
         char *record = (char *)data2record(getData, getAttrs, length);
@@ -280,13 +280,17 @@ RC Project::getNextTuple(void *data) {
         {
             unsigned short startIdx;
             unsigned short endIdx;
-            memcpy(&startIdx, record + sizeof(int) + 2 * attrsIdx[i], sizeof(short));
-            if (attrsIdx[i] == getAttrs.size() - 1) {
-                endIdx = length;
+            if (attrsIdx[i] == 0) {
+                startIdx = sizeof(short) * getAttrs.size() + sizeof(int);
             }
             else {
-                memcpy(&endIdx, record + sizeof(int) + 2 * (attrsIdx[i] + 1), sizeof(short));
+                unsigned short offset;
+                memcpy(&offset, record + sizeof(int) + 2 * (attrsIdx[i] - 1), sizeof(short));
+                startIdx = sizeof(short) * getAttrs.size() + sizeof(int) + offset;
             }
+            unsigned short offset;
+            memcpy(&offset, record + sizeof(int) + 2 * attrsIdx[i], sizeof(short));
+            endIdx = sizeof(short) * getAttrs.size() + sizeof(int) + offset;
             memcpy((char *)wantRecord + wantLength, record + startIdx, endIdx - startIdx);
             memcpy((char *)wantRecord + ptrPosition, &wantLength, sizeof(short));
             wantLength += endIdx - startIdx;
@@ -448,9 +452,12 @@ void BNLJoin::buildMap() {
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op) {
     this->input = input;
     this->aggAttr = aggAttr;
+    string attrName = aggAttr.name;
     this->op = op;
     input->getAttributes(getAttrs);
-    attrId = find(getAttrs.begin(), getAttrs.end(), aggAttr) - getAttrs.begin();
+    attrId = find_if(getAttrs.begin(), getAttrs.end(), [attrName] (const Attribute& attr) {
+                        return attr.name == attrName;
+                    }) - getAttrs.begin();
 }
 
 RC Aggregate::getNextTuple(void *data) {
@@ -460,12 +467,21 @@ RC Aggregate::getNextTuple(void *data) {
     float sum = 0;
     float count = 0;
     void* num = malloc(sizeof(int));
+    bool eof = true;
     
     while(input->getNextTuple(getData) != QE_EOF){
+        eof = false;
         unsigned short length = 0;
         char *record = (char *)data2record(getData, getAttrs, length);
         unsigned short startIdx;
-        memcpy(&startIdx, record + sizeof(int) + 2 * attrId, sizeof(short));
+        if (attrId == 0) {
+            startIdx = sizeof(short) * getAttrs.size() + sizeof(int);
+        }
+        else {
+            unsigned short offset;
+            memcpy(&offset, record + sizeof(int) + 2 * (attrId - 1), sizeof(short));
+            startIdx = sizeof(short) * getAttrs.size() + sizeof(int) + offset;
+        }
         memcpy(num, record + startIdx, sizeof(int));
         delete[] record;
         float val;
@@ -502,6 +518,11 @@ RC Aggregate::getNextTuple(void *data) {
                 break;
         }
     }
+    if (eof) {
+        delete[] getData;
+        free(num);
+        return QE_EOF;
+    }
     float res;
     switch (op)
     {
@@ -523,12 +544,13 @@ RC Aggregate::getNextTuple(void *data) {
         default:
             break;
     }
-
-    memcpy(data, &res, sizeof(float));
+    char nullIndicator = 1<<7;
+    memcpy(data, &nullIndicator, sizeof(char));
+    memcpy((char *)data + sizeof(char), &res, sizeof(float));
     
     delete[] getData;
     free(num);
-    return QE_EOF;
+    return 0;
 }
 
 void Aggregate::getAttributes(vector<Attribute> &attrs) const {
