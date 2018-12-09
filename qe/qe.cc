@@ -280,13 +280,17 @@ RC Project::getNextTuple(void *data) {
         {
             unsigned short startIdx;
             unsigned short endIdx;
-            memcpy(&startIdx, record + sizeof(int) + 2 * attrsIdx[i], sizeof(short));
-            if (attrsIdx[i] == getAttrs.size() - 1) {
-                endIdx = length;
+            if (attrsIdx[i] == 0) {
+                startIdx = sizeof(short) * getAttrs.size() + sizeof(int);
             }
             else {
-                memcpy(&endIdx, record + sizeof(int) + 2 * (attrsIdx[i] + 1), sizeof(short));
+                unsigned short offset;
+                memcpy(&offset, record + sizeof(int) + 2 * (attrsIdx[i] - 1), sizeof(short));
+                startIdx = sizeof(short) * getAttrs.size() + sizeof(int) + offset;
             }
+            unsigned short offset;
+            memcpy(&offset, record + sizeof(int) + 2 * attrsIdx[i], sizeof(short));
+            endIdx = sizeof(short) * getAttrs.size() + sizeof(int) + offset;
             memcpy((char *)wantRecord + wantLength, record + startIdx, endIdx - startIdx);
             memcpy((char *)wantRecord + ptrPosition, &wantLength, sizeof(short));
             wantLength += endIdx - startIdx;
