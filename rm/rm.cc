@@ -589,9 +589,11 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
     RBFM_ScanIterator rbfmIter;
     vector<string> attrStr;
     attrStr.push_back(attributeName);
-    rbfm->openFile(columnFileName, fileHandle);
+    rc = rbfm->openFile(tableName, fileHandle);
+    if(rc != SUCCESS) {cout<<"open file fail"<<endl;return -1;}
     rc = rbfm->scan(fileHandle, attrs, "", NO_OP, NULL, attrStr, rbfmIter);
-    if(rc != SUCCESS) {cout<<"fail"<<endl;return -1;}
+    cout<<"scan"<<endl;
+    if(rc != SUCCESS) {cout<<"fail"<<endl;return SUCCESS;}
     void* data = malloc(4000);
     void* key = malloc(4000);
     memset(key,0,4000);
@@ -599,10 +601,14 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
     RID rid;
     IXFileHandle ixfileHandle;
     rc = indexManager->openFile(indexFileName, ixfileHandle);
+    cout<<"open file"<<endl;
     if(rc != SUCCESS) return rc;
+    int i=0;
     while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
         memcpy((char*)key, (char*)data+1, 3999);
-        indexManager->insertEntry(ixfileHandle, targetAttr, key, rid);
+        rc = indexManager->insertEntry(ixfileHandle, targetAttr, key, rid);
+        if(rc != SUCCESS) return rc;
+        cout<<"insert entry: "<<indexFileName<<": "<<i++<<endl;
         memset(key,0,4000);
         memset(data,0,4000);
     }
