@@ -196,11 +196,18 @@ class Filter : public Iterator {
         Filter(Iterator *input,               // Iterator of input R
                const Condition &condition     // Selection condition
         );
-        ~Filter(){};
+        ~Filter() {};
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        Iterator *input;
+        Condition condition;
+        vector<Attribute> attrs;
+
+        // Return the compare result of lhsValue and rhsValue
+        bool compare(CompOp op, AttrType type, char* lhsValue, char* rhsValue);
+
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 
@@ -208,12 +215,20 @@ class Project : public Iterator {
     // Projection operator
     public:
         Project(Iterator *input,                    // Iterator of input R
-              const vector<string> &attrNames){};   // vector containing attribute names
-        ~Project(){};
+              const vector<string> &attrNames);     // vector containing attribute names
+        ~Project();
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        Iterator *input;
+        vector<string> attrNames;
+        vector<Attribute> getAttrs;
+        vector<Attribute> wantAttrs;
+        vector<int> attrsIdx;
+        bool attrNotFound;
+        void* getData;
+
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 class BNLJoin : public Iterator {
@@ -271,7 +286,7 @@ class Aggregate : public Iterator {
         Aggregate(Iterator *input,          // Iterator of input R
                   Attribute aggAttr,        // The attribute over which we are computing an aggregate
                   AggregateOp op            // Aggregate operation
-        ){};
+        );
 
         // Optional for everyone: 5 extra-credit points
         // Group-based hash aggregation
@@ -279,14 +294,20 @@ class Aggregate : public Iterator {
                   Attribute aggAttr,           // The attribute over which we are computing an aggregate
                   Attribute groupAttr,         // The attribute over which we are grouping the tuples
                   AggregateOp op              // Aggregate operation
-        ){};
+        );
         ~Aggregate(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        Iterator *input;
+        Attribute aggAttr;
+        AggregateOp op;
+        vector<Attribute> getAttrs;
+        int attrId;
+
+        RC getNextTuple(void *data);
         // Please name the output attribute as aggregateOp(aggAttr)
         // E.g. Relation=rel, attribute=attr, aggregateOp=MAX
         // output attrname = "MAX(rel.attr)"
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 #endif
