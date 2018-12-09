@@ -2,6 +2,7 @@
 #define _qe_h_
 
 #include <vector>
+#include <queue>
 
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
@@ -231,6 +232,12 @@ class Project : public Iterator {
         void getAttributes(vector<Attribute> &attrs) const;
 };
 
+class DataDir {
+    public:
+        queue<void *> data;
+        queue<int> length;
+};
+
 class BNLJoin : public Iterator {
     // Block nested-loop join operator
     public:
@@ -239,12 +246,31 @@ class BNLJoin : public Iterator {
                const Condition &condition,   // Join condition
                const unsigned numPages       // # of pages that can be loaded into memory,
 			                                 //   i.e., memory block size (decided by the optimizer)
-        ){};
+        );
         ~BNLJoin(){};
+
+        Iterator *leftIn;
+        TableScan *rightIn;
+        Condition condition;
+        unsigned numPages;
+        map<int, DataDir> intMap;
+        map<float, DataDir> floatMap;
+        map<string, DataDir> stringMap;
+        DataDir leftData;
+        DataDir leftNextData;
+        DataDir rightData;
+        DataDir rightNextData;
+        vector<Attribute> leftAttrs;
+        int leftAttrId;
 
         RC getNextTuple(void *data){return QE_EOF;};
         // For attribute in vector<Attribute>, name it as rel.attr
         void getAttributes(vector<Attribute> &attrs) const{};
+        // Return the length of data
+        int dataLength(const void* data, const vector<Attribute>& recordDescriptor);
+        RC loadPages(Iterator *input, DataDir dataDir, DataDir nextData, int maxLen, const vector<Attribute> &attrs);
+        // Use leftData to build hash map
+        void buildMap();
 };
 
 
