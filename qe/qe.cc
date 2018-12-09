@@ -269,10 +269,10 @@ RC Project::getNextTuple(void *data) {
     if (input->getNextTuple(getData) != QE_EOF) {
         char* wantRecord = new char[PAGE_SIZE];
         int wantLength = 0;
-        short num = wantAttrs.size();
-        memcpy(wantRecord, &num, sizeof(short));
-        wantLength += sizeof(short) + 2 * wantAttrs.size();
-        int ptrPosition = sizeof(short);
+        int num = wantAttrs.size();
+        memcpy(wantRecord, &num, sizeof(int));
+        wantLength += sizeof(int) + sizeof(short) * wantAttrs.size();
+        int ptrPosition = sizeof(int);
 
         unsigned short length = 0;
         char *record = (char *)data2record(getData, getAttrs, length);
