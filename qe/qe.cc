@@ -306,6 +306,142 @@ void Project::getAttributes(vector<Attribute> &attrs) const {
     }
 }
 
+BNLJoin::BNLJoin(Iterator *leftIn, TableScan *rightIn, const Condition &condition, const unsigned numPages) {
+    this->leftIn = leftIn;
+    this->rightIn = rightIn;
+    this->condition = condition;
+    this->numPages = numPages;
+    leftIn->getAttributes(leftAttrs);
+    leftAttrId = find(leftAttrs.begin(), leftAttrs.end(), condition.lhsAttr) - leftAttrs.begin();
+}
+
+int BNLJoin::dataLength(const void* data, const vector<Attribute>& recordDescriptor) {
+    int dataPos = 0;
+    int attrNum = recordDescriptor.size();
+    int nullIndSize = ceil((double)attrNum/(double)8);
+    vector<bitset<8>> nullBits = nullIndicators(nullIndSize, data);
+    dataPos += nullIndSize;
+    for(int i=0;i<attrNum;i++){
+        if(nullBits[i/8][7-i%8] == 0){
+            if(recordDescriptor[i].type == 0 || recordDescriptor[i].type == 1){
+                dataPos += 4;
+            } else{
+                int stringLength;
+                memcpy(&stringLength, (char*)data+dataPos, sizeof(int));
+                dataPos += 4 + stringLength;
+            }
+        }
+    }
+    return dataPos;
+}
+
+RC BNLJoin::loadPages(Iterator *input, DataDir dataDir, DataDir nextData, int maxLen, const vector<Attribute> &attrs) {
+    if (nextData.data.size() > 0) {
+        dataDir.data.push(nextData.data.front());
+        dataDir.length.push(nextData.length.front());
+        nextData.data.pop();
+        nextData.length.pop();
+    }
+    int curLen = 0;
+    
+    void* data = malloc(PAGE_SIZE);
+    while(input->getNextTuple(data) != QE_EOF){
+        int len = dataLength(data, attrs);
+        curLen += len;
+        if (curLen > maxLen) {
+            nextData.data.push(data);
+            nextData.length.push(len);
+            free(data);
+            return 0;
+        }
+        dataDir.data.push(data);
+        dataDir.length.push(len);
+    }
+    free(data);
+    return QE_EOF;
+}
+
+void BNLJoin::buildMap() {
+    while(leftData.data.size() > 0){
+        void* data = leftData.data.front();
+        leftData.data.pop();
+        int len = leftData.length.front();
+        leftData.length.pop();
+        unsigned short length = 0;
+        void* record = data2record(data, leftAttrs, length);
+        switch (leftAttrs[leftAttrId].type)
+        {
+            case TypeInt:
+            {
+                short offset;
+                memcpy(&offset, (char *)record + sizeof(int) + sizeof(short) * leftAttrId, sizeof(short));
+                int val;
+                memcpy(&val, (char *)record + offset, sizeof(int));
+                if (intMap.find(val) == intMap.end()) {
+                    DataDir dataDir;
+                    dataDir.data.push(data);
+                    dataDir.length.push(len);
+                    intMap[val] = dataDir;
+                }
+                else {
+                    intMap[val].data.push(data);
+                    intMap[val].length.push(len);
+                }
+                break;
+            }
+                
+            case TypeReal:
+            {
+                short offset;
+                memcpy(&offset, (char *)record + sizeof(int) + sizeof(short) * leftAttrId, sizeof(short));
+                float val;
+                memcpy(&val, (char *)record + offset, sizeof(float));
+                if (floatMap.find(val) == floatMap.end()) {
+                    DataDir dataDir;
+                    dataDir.data.push(data);
+                    dataDir.length.push(len);
+                    floatMap[val] = dataDir;
+                }
+                else {
+                    floatMap[val].data.push(data);
+                    floatMap[val].length.push(len);
+                }
+                break;
+            }
+                
+            case TypeVarChar:
+            {
+                short offset;
+                memcpy(&offset, (char *)record + sizeof(int) + sizeof(short) * leftAttrId, sizeof(short));
+                int l;
+                memcpy(&l, (char *)record + offset, sizeof(int));
+                char* val = new char[PAGE_SIZE]; //TODO: delete[]
+                memcpy(&val, (char *)record + offset + sizeof(int), l);
+                string str(val, l);
+
+                if (stringMap.find(str) == stringMap.end()) {
+                    DataDir dataDir;
+                    dataDir.data.push(data);
+                    dataDir.length.push(len);
+                    stringMap[str] = dataDir;
+                }
+                else {
+                    stringMap[str].data.push(data);
+                    stringMap[str].length.push(len);
+                }
+                break;
+            }
+                
+            default:
+                break;
+        }
+    }
+}
+
+RC BNLJoin::getNextTuple(void *data) {
+    
+}
+
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op) {
     this->input = input;
     this->aggAttr = aggAttr;
