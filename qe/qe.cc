@@ -462,8 +462,8 @@ RC BNLJoin::getNextTuple(void *data) {
     }
 
     while (load left pages != QE_EOF) {
+        build map
         while (load right page != QE_EOF) {
-            build map
             while (rightData not empty) {
                 pop rightData
                 check in map
