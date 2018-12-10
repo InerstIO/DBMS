@@ -276,15 +276,21 @@ class BNLJoin : public Iterator {
 class INLJoin : public Iterator {
     // Index nested-loop join operator
     public:
+        Iterator* leftIn;
+        IndexScan* rightIn;
+        Condition condition;
+        vector<Attribute> leftAttrs;
+        vector<Attribute> rightAttrs;
+
         INLJoin(Iterator *leftIn,           // Iterator of input R
                IndexScan *rightIn,          // IndexScan Iterator of input S
                const Condition &condition   // Join condition
-        ){};
+        );
         ~INLJoin(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 // Optional for everyone. 10 extra-credit points
@@ -334,5 +340,4 @@ class Aggregate : public Iterator {
         // output attrname = "MAX(rel.attr)"
         void getAttributes(vector<Attribute> &attrs) const;
 };
-
 #endif

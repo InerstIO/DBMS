@@ -788,3 +788,121 @@ void Aggregate::getAttributes(vector<Attribute> &attrs) const {
     attr.name = aggOp + "(" + aggAttr.name + ")";
     attrs.push_back(attr);
 }
+
+INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition){
+	this->leftIn = leftIn;
+	this->rightIn = rightIn;
+	this->condition = condition;
+	leftIn->getAttributes(leftAttrs);
+	rightIn->getAttributes(rightAttrs);
+}
+
+void INLJoin::getAttributes(vector<Attribute> &attrs) const{
+	for(int i=0;i<leftAttrs.size();i++){
+		Attribute attr = leftAttrs[i];
+		attrs.push_back(attr);
+	}
+	for(int i=0;i<rightAttrs.size();i++){
+		Attribute attr = rightAttrs[i];
+		attrs.push_back(attr);
+	}
+}
+
+RC INLJoin::getNextTuple(void *data){
+	void* leftData = malloc(PAGE_SIZE);
+	memset((char*)leftData, 0, PAGE_SIZE);
+	void* rightData = malloc(PAGE_SIZE);
+	memset((char*)rightData, 0, PAGE_SIZE);
+	//rightIn->setIterator(NULL, NULL, false, false);
+	while(leftIn->getNextTuple(leftData) != QE_EOF){
+		unsigned short length = 0;
+		//void* leftRecord = data2record(leftData, leftAttrs, length);
+		string targetAttrName;
+		targetAttrName = condition.lhsAttr;
+		//targetAttrName = targetAttrName.substr(targetAttrName.find(".")+1);
+		//cout<<targetAttrName<<endl;
+		void* targetData = malloc(PAGE_SIZE);
+		memset((char*)targetData,0,PAGE_SIZE);
+		//readAttributeFromRecord(leftRecord, length, leftAttrs, targetAttrName, targetData);
+
+		//get target data
+		vector<bitset<8>> nullBytes;
+		int offset = ceil(leftAttrs.size()/8.0);
+		for(int i=0;i<offset;i++){
+			nullBytes.push_back(bitset<8>((char*)leftData+i));
+		}
+		for(int i=0;i<leftAttrs.size();i++){
+			if(nullBytes[i/8][i%8] == 1) continue;
+			if(leftAttrs[i].name == targetAttrName){
+				if(leftAttrs[i].type == 2){
+					int l = 0;
+					memcpy(&l, (char*)leftData+offset, 4);
+					memcpy(targetData, (char*)leftData+offset, 4+l);
+				} else{
+					memcpy(targetData, (char*)leftData+offset, 4);
+				}
+				break;
+			} else{
+				if(leftAttrs[i].type == 2){
+					int l = 0;
+					memcpy(&l, (char*)leftData+offset, 4);
+					offset = offset+4+l;
+				} else{
+					offset += 4;
+				}
+			}
+		}
+		//cout<<"targetData: "<<*(float*)((char*)targetData)<<endl;
+		rightIn->setIterator(targetData, targetData, true, true);
+		while(rightIn->getNextTuple(rightData) != QE_EOF){
+			//cout<<"right"<<endl;
+			vector<char> nullBits(ceil((leftAttrs.size()+rightAttrs.size())/8.0), 0);
+			int i = 0;
+			for(int j=0;j<leftAttrs.size();j++){
+				char nullByte = *((char*)leftData+j/8);
+				bitset<8> curBit(nullByte);
+				nullBits[i/8] += curBit[j%8]<<(i%8);
+				i++;
+			}
+			for(int j=0;j<rightAttrs.size();j++){
+				char nullByte = *((char*)rightData+j/8);
+				bitset<8> curBit(nullByte);
+				nullBits[i/8] += curBit[j%8]<<(i%8);
+				i++;
+			}
+			int offset = 0;
+			int leftOffset = 0;
+			for(int i=0;i<nullBits.size();i++){
+				memcpy((char*)data+offset, &(nullBits[i]), 1);
+				offset++;
+			}
+			for(i=0;i<leftAttrs.size();i++){
+				if(leftAttrs[i].type == TypeVarChar){
+					int l = leftAttrs[i].length;
+					memcpy((char*)data+offset, &l, sizeof(int));
+					offset += 4;
+				}
+				memcpy((char*)data+offset, (char*)leftData+(int)ceil(leftAttrs.size()/8.0)+leftOffset, leftAttrs[i].length);
+				offset += leftAttrs[i].length;
+				leftOffset += leftAttrs[i].length;
+			}
+			int rightOffset = 0;
+			for(i=0;i<rightAttrs.size();i++){
+				if(rightAttrs[i].type == TypeVarChar){
+					int l = rightAttrs[i].length;
+					memcpy((char*)data+offset, &l, sizeof(int));
+					offset += 4;
+				}
+				memcpy((char*)data+offset, (char*)rightData+(int)ceil(rightAttrs.size()/8.0)+rightOffset, rightAttrs[i].length);
+				offset += rightAttrs[i].length;
+				rightOffset += rightAttrs[i].length;
+			}
+			memset((char*)rightData, 0, PAGE_SIZE);
+			return SUCCESS;
+		}
+		free(targetData);
+	}
+	free(leftData);
+	free(rightData);
+	return QE_EOF;
+}
