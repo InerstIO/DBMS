@@ -669,13 +669,13 @@ RC RelationManager::indexScan(const string &tableName,
     if(!findAttr) return -1;
 
     string indexFileName = tableName+"."+attributeName;
-    IXFileHandle ixfileHandle;
-    rc = indexManager->openFile(indexFileName, ixfileHandle);
+    rc = indexManager->openFile(indexFileName, rm_IndexScanIterator.ixfileHandle);
     if(rc != SUCCESS) return rc;
-    rc = indexManager->scan(ixfileHandle, targetAttr, lowKey, highKey, lowKeyInclusive, highKeyInclusive, rm_IndexScanIterator.ix_ScanIterator);
+    IX_ScanIterator ix_ScanIterator;
+    rc = indexManager->scan(rm_IndexScanIterator.ixfileHandle, targetAttr, lowKey, highKey, lowKeyInclusive, highKeyInclusive, rm_IndexScanIterator.ix_ScanIterator);
     if(rc != SUCCESS) return rc;
-    rc = indexManager->closeFile(ixfileHandle);
-    if(rc != SUCCESS) return rc;
+    //rc = indexManager->closeFile(ixfileHandle);
+    //if(rc != SUCCESS) return rc;
     return SUCCESS;
 }
 
@@ -683,6 +683,7 @@ RC RM_IndexScanIterator::getNextEntry(RID &rid, void *key){
     return ix_ScanIterator.getNextEntry(rid, key);
 }
 RC RM_IndexScanIterator::close(){
+    indexManager->closeFile(ixfileHandle);
     return ix_ScanIterator.close();
 }
 
