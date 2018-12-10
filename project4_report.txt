@@ -23,6 +23,7 @@ inner while loop loads a page from rightIn, so that we don't need to build the m
 
 4. Index Nested Loop Join (If you have implemented this feature)
 - Describe how your grace hash join works.
+Firstly, we do the iterate to thr outer table. Then, we get the target data, and set the condition of scan inner loop as the tuples that have the same value of target data. In the end, we join their data together.
 
 
 5. Grace Hash Join (If you have implemented this feature)
