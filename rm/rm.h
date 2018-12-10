@@ -35,8 +35,9 @@ class RM_IndexScanIterator {
   ~RM_IndexScanIterator() {}; 	// Destructor
   IX_ScanIterator ix_ScanIterator;
   RelationManager* rm;
-  FileHandle fileHandle;
+  IXFileHandle ixfileHandle;
   string tableName;
+  IndexManager* indexManager = IndexManager::instance();
   // "key" follows the same format as in IndexManager::insertEntry()
   RC getNextEntry(RID &rid, void *key);  	// Get next matching entry
   RC close();             			// Terminate index scan
