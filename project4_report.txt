@@ -1,11 +1,11 @@
 1. Basic information
-Team number (e.g., 01) : 
-#1 Student ID : 
-#1 Student Name : 
-#2 Student ID : 
-#2 Student Name : 
-OS (bit) :
-gcc version :
+Team number (e.g., 01) : 23
+#1 Student ID : 20689831
+#1 Student Name : Yuxuan Hao
+#2 Student ID : 25245625
+#2 Student Name : Yu Feng
+OS (bit) : Ubuntu 16.04.3 x64
+gcc version : 5.4.0 20160609
 
 
 2. Catalog information about Index
@@ -14,6 +14,11 @@ gcc version :
 
 3. Block Nested Loop Join (If you have implemented this feature)
 - Describe how your block nested loop join works (especially, how you manage the given buffers.)
+We maintain a outputBuffer which is one page large. Whenever getNextTuple is called, we first check whether there are data left
+in the outputBuffer. If there are data in it, simple return the data and pop the outputBuffer. If there is no data in the outputBuffer,
+we load numPages*PAGE_SIZE data from leftIn and build hash map, then read one page from rightIn to check whether there are joinable
+data in the hah map to do the join and push the joined data into the outputBuffer. The outer while loop loads numPages from leftIn, the 
+inner while loop loads a page from rightIn, so that we don't need to build the map too many times, which is time consuming.
 
 
 4. Index Nested Loop Join (If you have implemented this feature)
@@ -26,12 +31,15 @@ gcc version :
 
 6. Aggregation
 - Describe how your aggregation (basic, group-based hash) works.
-
+basic:
+Simply iterate through all the data and keep track of MAX/MIN/COUNT/SUM, and return the result at the end.
 
 7. Implementation Detail
 - Have you added your own source file (.cc or .h)?
+No.
 
 - Have you implemented any optional features? Then, describe them here.
+No.
 
 - Other implementation details:
 
