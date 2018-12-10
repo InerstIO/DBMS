@@ -2,6 +2,8 @@
 #define _qe_h_
 
 #include <vector>
+#include <queue>
+#include <deque>
 
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
@@ -196,11 +198,18 @@ class Filter : public Iterator {
         Filter(Iterator *input,               // Iterator of input R
                const Condition &condition     // Selection condition
         );
-        ~Filter(){};
+        ~Filter() {};
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        Iterator *input;
+        Condition condition;
+        vector<Attribute> attrs;
+
+        // Return the compare result of lhsValue and rhsValue
+        bool compare(CompOp op, AttrType type, char* lhsValue, char* rhsValue);
+
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 
@@ -208,12 +217,20 @@ class Project : public Iterator {
     // Projection operator
     public:
         Project(Iterator *input,                    // Iterator of input R
-              const vector<string> &attrNames){};   // vector containing attribute names
-        ~Project(){};
+              const vector<string> &attrNames);     // vector containing attribute names
+        ~Project();
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        Iterator *input;
+        vector<string> attrNames;
+        vector<Attribute> getAttrs;
+        vector<Attribute> wantAttrs;
+        vector<int> attrsIdx;
+        bool attrNotFound;
+        void* getData;
+
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 class BNLJoin : public Iterator {
@@ -224,27 +241,56 @@ class BNLJoin : public Iterator {
                const Condition &condition,   // Join condition
                const unsigned numPages       // # of pages that can be loaded into memory,
 			                                 //   i.e., memory block size (decided by the optimizer)
-        ){};
+        );
         ~BNLJoin(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        Iterator *leftIn;
+        TableScan *rightIn;
+        Condition condition;
+        unsigned numPages;
+        map<int, deque<void *>> intMap;
+        map<float, deque<void *>> floatMap;
+        map<string, deque<void *>> stringMap;
+        queue<void *> leftData;
+        queue<void *> leftNextData;
+        queue<void *> rightData;
+        queue<void *> rightNextData;
+        deque<void *> outputBuffer;
+        vector<Attribute> leftAttrs;
+        vector<Attribute> rightAttrs;
+        vector<Attribute> wantAttr;
+        int leftAttrId;
+        int rightAttrId;
+
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
+        // Return the length of data
+        int dataLength(const void* data, const vector<Attribute>& recordDescriptor);
+        RC loadPages(Iterator *input, queue<void *> &curData, queue<void *> &nextData, int maxLen, const vector<Attribute> &attrs);
+        // Use leftData to build hash map
+        void buildMap();
 };
 
 
 class INLJoin : public Iterator {
     // Index nested-loop join operator
     public:
+        Iterator* leftIn;
+        IndexScan* rightIn;
+        Condition condition;
+        vector<Attribute> leftAttrs;
+        vector<Attribute> rightAttrs;
+
         INLJoin(Iterator *leftIn,           // Iterator of input R
                IndexScan *rightIn,          // IndexScan Iterator of input S
                const Condition &condition   // Join condition
-        ){};
+        );
         ~INLJoin(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 // Optional for everyone. 10 extra-credit points
@@ -271,7 +317,7 @@ class Aggregate : public Iterator {
         Aggregate(Iterator *input,          // Iterator of input R
                   Attribute aggAttr,        // The attribute over which we are computing an aggregate
                   AggregateOp op            // Aggregate operation
-        ){};
+        );
 
         // Optional for everyone: 5 extra-credit points
         // Group-based hash aggregation
@@ -282,11 +328,16 @@ class Aggregate : public Iterator {
         ){};
         ~Aggregate(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        Iterator *input;
+        Attribute aggAttr;
+        AggregateOp op;
+        vector<Attribute> getAttrs;
+        int attrId;
+
+        RC getNextTuple(void *data);
         // Please name the output attribute as aggregateOp(aggAttr)
         // E.g. Relation=rel, attribute=attr, aggregateOp=MAX
         // output attrname = "MAX(rel.attr)"
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
-
 #endif

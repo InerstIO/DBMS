@@ -41,11 +41,16 @@ RelationManager::RelationManager()
     columnLength.name = "column-length";
     Attribute columnPosition = columnType;
     columnPosition.name = "column-position";
+    Attribute hasIndex;
+    hasIndex.name = "hasIndex";
+    hasIndex.type = TypeInt;
+    hasIndex.length = 4;
     columnAttr.push_back(tableID);
     columnAttr.push_back(columnName);
     columnAttr.push_back(columnType);
     columnAttr.push_back(columnLength);
     columnAttr.push_back(columnPosition);
+    columnAttr.push_back(hasIndex);
 }
 
 RelationManager::~RelationManager()
@@ -98,6 +103,9 @@ RC RelationManager::createCatalog()
         insertTupleHelper(columnFileName, columnAttr, data, rid);
         length = 0;memset(data, 0, 4000);
         rcc = generateColumnRecord(2, "column-position", TypeInt, 4, 5, data, length);
+        if(rcc != SUCCESS) return -1;
+        length = 0;memset(data, 0, 4000);
+        rcc = generateColumnRecord(2, "hasIndex", TypeInt, 4, 6, data, length);
         if(rcc != SUCCESS) return -1;
         insertTupleHelper(columnFileName, columnAttr, data, rid);
         free(data);
@@ -195,7 +203,7 @@ RC RelationManager::deleteTable(const string &tableName)
         pos += 4;
         string targetTableName;
         targetTableName.resize(length);
-        memcpy((char*)targetTableName.data(),data+pos,length);
+        memcpy((char*)targetTableName.data(),(char*)data+pos,length);
         pos += length;
         bool isTableSame = (targetTableName==tableName);
         if(isTableSame){
@@ -258,7 +266,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         pos += 4;
         string name;
         name.resize(length);
-        memcpy((char*)name.data(),data+pos,length);
+        memcpy((char*)name.data(),(char*)data+pos,length);
         pos += length;
         if(name == tableName){
             tableId = id;
@@ -339,6 +347,32 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     if(rc != SUCCESS) return rc;
     rc = rbfm->closeFile(fileHandle);
     if(rc != SUCCESS) return rc;
+
+    //insert to index
+
+    void* key = malloc(4000);
+    memset((char*)key, 0, 4000);
+    for(int i=0;i<attrs.size();i++){
+        bool hasIx = false;
+        rc = hasIndex(tableName, attrs[i].name, hasIx);
+        if(rc != SUCCESS) return rc;
+        //cout<<"inserttuple: "<<attrs[i].name<<", "<<(hasIx?"true":"false")<<endl;
+        if(hasIx){
+            rc = readAttribute(tableName, rid, attrs[i].name, key);
+            if(rc != SUCCESS) return rc;
+            string indexFileName = tableName+"."+attrs[i].name;
+            IXFileHandle ixfileHandle;
+            rc = indexManager->openFile(indexFileName, ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            //cout<<"insert entry: "<<attrs[i].name<<", "<<*(int*)((char*)key+1)<<endl;
+            rc = indexManager->insertEntry(ixfileHandle, attrs[i], ((char*)key+1), rid);
+            if(rc != SUCCESS) return rc;
+            rc = indexManager->closeFile(ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            memset((char*)key, 0, 4000);
+        }
+    }
+    free(key);
     return SUCCESS;
 }
 
@@ -355,16 +389,42 @@ RC RelationManager::insertTupleHelper(const string &tableName, vector<Attribute>
 
 RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 {
+    //cout<<"delete tuple"<<endl;
     FileHandle fileHandle;
     vector<Attribute> attrs;
     RC rc = getAttributes(tableName, attrs);
     if(rc != SUCCESS) return rc;
+
+    //delete index entry
+    void* data = malloc(4000);
+    memset(data,0,4000);
+    for(int i=0;i<attrs.size();i++){
+        bool hasIx = false;
+        rc = hasIndex(tableName, attrs[i].name, hasIx);
+        if(rc != SUCCESS) return rc;
+        if(hasIx){
+            rc = readAttribute(tableName, rid, attrs[i].name, data);
+            if(rc != SUCCESS) return rc;
+            string indexFileName = tableName+"."+attrs[i].name;
+            IXFileHandle ixfileHandle;
+            rc = indexManager->openFile(indexFileName, ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            rc = indexManager->deleteEntry(ixfileHandle, attrs[i], ((char*)data+1), rid);
+            if(rc != SUCCESS) return rc;
+            rc = indexManager->closeFile(ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            memset(data,0,4000);
+        }
+    }
+    free(data);
+
     rc = rbfm->openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
     rc = rbfm->deleteRecord(fileHandle, attrs, rid);
     if(rc != SUCCESS) return rc;
     rc = rbfm->closeFile(fileHandle);
-    return rc;
+    if(rc != SUCCESS) return rc;
+    return SUCCESS;
 }
 
 RC RelationManager::updateTuple(const string &tableName, const void *data, const RID &rid)
@@ -373,12 +433,66 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
     vector<Attribute> attrs;
     RC rc = getAttributes(tableName, attrs);
     if(rc != SUCCESS) return rc;
+
+    //delete original index entries
+    void* originData = malloc(4000);
+    memset(originData,0,4000);
+    for(int i=0;i<attrs.size();i++){
+        bool hasIx = false;
+        rc = hasIndex(tableName, attrs[i].name, hasIx);
+        if(rc != SUCCESS) return rc;
+        if(hasIx){
+            //int temp;
+            rc = readAttribute(tableName, rid, attrs[i].name, originData);
+            if(rc != SUCCESS) return rc;
+            string indexFileName = tableName+"."+attrs[i].name;
+            IXFileHandle ixfileHandle;
+            rc = indexManager->openFile(indexFileName, ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            //cout<<indexFileName<<", "<<attrs[i].name<<", "<<*(int*)((char*)originData+1)<<endl;
+            rc = indexManager->deleteEntry(ixfileHandle, attrs[i], ((char*)originData+1), rid);
+            if(rc != SUCCESS) return rc;
+            rc = indexManager->closeFile(ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            memset(originData,0,4000);
+        }
+    }
+    //cout<<"delete entry"<<endl;
+
+//update record
     rc = rbfm->openFile(tableName, fileHandle);
     if(rc != SUCCESS) return rc;
     rc = rbfm->updateRecord(fileHandle, attrs, data, rid);
     if(rc != SUCCESS) return rc;
     rc = rbfm->closeFile(fileHandle);
-    return rc;
+    if(rc != SUCCESS) return rc;
+    //cout<<"update record"<<endl;
+
+//insert new data to index entries
+    void* key = malloc(4000);
+    memset((char*)key, 0, 4000);
+    for(int i=0;i<attrs.size();i++){
+        bool hasIx = false;
+        rc = hasIndex(tableName, attrs[i].name, hasIx);
+        if(rc != SUCCESS) return rc;
+        if(hasIx){
+            rc = readAttribute(tableName, rid, attrs[i].name, key);
+            if(rc != SUCCESS) return rc;
+            string indexFileName = tableName+"."+attrs[i].name;
+            IXFileHandle ixfileHandle;
+            rc = indexManager->openFile(indexFileName, ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            rc = indexManager->insertEntry(ixfileHandle, attrs[i], key, rid);
+            if(rc != SUCCESS) return rc;
+            rc = indexManager->closeFile(ixfileHandle);
+            if(rc != SUCCESS) return rc;
+            memset((char*)key, 0, 4000);
+        }
+    }
+    //cout<<"insert entry"<<endl;
+    free(key);
+
+    return SUCCESS;
 }
 
 RC RelationManager::readTuple(const string &tableName, const RID &rid, void *data)
@@ -460,12 +574,74 @@ RC RelationManager::addAttribute(const string &tableName, const Attribute &attr)
 
 RC RelationManager::createIndex(const string &tableName, const string &attributeName)
 {
-	return -1;
+    //cout<<attributeName<<endl;
+    bool hasIx;
+    RC rc = hasIndex(tableName, attributeName, hasIx);
+    if(hasIx) return -1;
+    string indexFileName = tableName+"."+attributeName;
+    rc = indexManager->createFile(indexFileName);
+    if(rc != SUCCESS) return -1;
+    //cout<<"set index true"<<endl;
+    setIndex(tableName, attributeName, true);
+
+    vector<Attribute> attrs;
+    rc = getAttributes(tableName, attrs);
+    if(rc != SUCCESS) return rc;
+    Attribute targetAttr;
+    for(int i=0;i<attrs.size();i++){
+        if(attrs[i].name == attributeName){
+            targetAttr = attrs[i];
+            break;
+        }
+    }
+
+    FileHandle fileHandle;
+    RBFM_ScanIterator rbfmIter;
+    vector<string> attrStr;
+    attrStr.push_back(attributeName);
+    rc = rbfm->openFile(tableName, fileHandle);
+    if(rc != SUCCESS) {
+        //cout<<"open file fail"<<endl;
+        return -1;
+    }
+    rc = rbfm->scan(fileHandle, attrs, "", NO_OP, NULL, attrStr, rbfmIter);
+    //cout<<"scan"<<endl;
+    if(rc != SUCCESS) {return SUCCESS;}
+    void* data = malloc(4000);
+    void* key = malloc(4000);
+    memset(key,0,4000);
+    memset(data,0,4000);
+    RID rid;
+    IXFileHandle ixfileHandle;
+    rc = indexManager->openFile(indexFileName, ixfileHandle);
+    //cout<<"open file"<<endl;
+    if(rc != SUCCESS) return rc;
+    int i=0;
+    while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
+        memcpy((char*)key, (char*)data+1, 3999);
+        rc = indexManager->insertEntry(ixfileHandle, targetAttr, key, rid);
+        if(rc != SUCCESS) return rc;
+        cout<<"insert entry: "<<indexFileName<<", "<<targetAttr.name<<": "<<i++<<": "<<*(float*)key<<endl;
+        memset(key,0,4000);
+        memset(data,0,4000);
+    }
+    rc = indexManager->closeFile(ixfileHandle);
+    if(rc != SUCCESS) return rc;
+    rc = rbfm->closeFile(fileHandle);
+    if(rc != SUCCESS) return rc;
+	return SUCCESS;
 }
 
 RC RelationManager::destroyIndex(const string &tableName, const string &attributeName)
 {
-	return -1;
+    bool hasIx;
+    RC rc = hasIndex(tableName, attributeName, hasIx);
+    if(!hasIx) return -1;
+    string indexFileName = tableName+"."+attributeName;
+    rc = indexManager->destroyFile(indexFileName);
+    if(rc != SUCCESS) return -1;
+    setIndex(tableName, attributeName, false);
+    return SUCCESS;
 }
 
 RC RelationManager::indexScan(const string &tableName,
@@ -476,9 +652,39 @@ RC RelationManager::indexScan(const string &tableName,
                       bool highKeyInclusive,
                       RM_IndexScanIterator &rm_IndexScanIterator)
 {
-	return -1;
+    rm_IndexScanIterator.rm = RelationManager::instance();
+    rm_IndexScanIterator.tableName = tableName;
+    bool findAttr = false;
+    vector<Attribute> attrs;
+    RC rc = getAttributes(tableName, attrs);
+    if(rc != SUCCESS) return rc;
+    Attribute targetAttr;
+    for(int i=0;i<attrs.size();i++){
+        if(attributeName == attrs[i].name){
+            targetAttr = attrs[i];
+            findAttr = true;
+            break;
+        }
+    }
+    if(!findAttr) return -1;
+
+    string indexFileName = tableName+"."+attributeName;
+    IXFileHandle ixfileHandle;
+    rc = indexManager->openFile(indexFileName, ixfileHandle);
+    if(rc != SUCCESS) return rc;
+    rc = indexManager->scan(ixfileHandle, targetAttr, lowKey, highKey, lowKeyInclusive, highKeyInclusive, rm_IndexScanIterator.ix_ScanIterator);
+    if(rc != SUCCESS) return rc;
+    rc = indexManager->closeFile(ixfileHandle);
+    if(rc != SUCCESS) return rc;
+    return SUCCESS;
 }
 
+RC RM_IndexScanIterator::getNextEntry(RID &rid, void *key){
+    return ix_ScanIterator.getNextEntry(rid, key);
+}
+RC RM_IndexScanIterator::close(){
+    return ix_ScanIterator.close();
+}
 
 RC RelationManager::generateTableRecord(int tableId, string tableName, string fileName, void* data, int& length){
     if(tableName.size()>50 || fileName.size()>50){
@@ -525,6 +731,161 @@ RC RelationManager::generateColumnRecord(int tableId, string columnName, int col
         length += 4;
         memcpy((char*)data+length, &columnPos, sizeof(int));
         length += 4;
+        //initially no index file
+        char noIndex = 0;
+        memcpy((char*)data+length, &noIndex, sizeof(char));
+        length += 1;
         return SUCCESS;
     }
+}
+
+RC RelationManager::hasIndex(const string& tableName, const string& columnName, bool& result){
+    int res = 2; //0 for false, 1 for true, 2 for not found
+    int tableId;
+    RC rc = getTableId(tableName, tableId);
+    if(rc != SUCCESS) return rc;
+
+    FileHandle fileHandle;
+    RBFM_ScanIterator rbfmIter;
+    vector<string> columnAttrStr;
+    for(int i=0;i<columnAttr.size();i++){
+        columnAttrStr.push_back(columnAttr[i].name);
+    }
+    rbfm->openFile(columnFileName, fileHandle);
+    rc = rbfm->scan(fileHandle, columnAttr, "", NO_OP, NULL, columnAttrStr, rbfmIter);
+    if(rc != SUCCESS) {cout<<"fail"<<endl;return -1;}
+    void* data = malloc(4000);
+    memset(data,0,4000);
+    RID rid;
+    while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
+        int pos = 1;
+        int id;
+        memcpy(&id, (char*)data+pos, sizeof(int));
+        pos += 4;
+        if(id == tableId){
+            int length;
+            memcpy(&length, (char*)data+pos, sizeof(int));
+            pos += 4;
+            string name;
+            name.resize(length);
+            memcpy((char*)name.data(),(char*)data+pos,length);
+            pos += length;
+            //cout<<"has index: "<<columnName<<", "<<name<<endl;
+            if(columnName == name){
+                pos += 12;
+                memcpy(&res, (char*)data+pos, 4);
+                //cout<<"get pos: "<<id<<", "<<name<<", "<<pos<<", "<<res<<", "<<rid.pageNum<<", "<<rid.slotNum<<endl;
+                break;
+            }
+        }
+        memset(data,0,4000);
+    }
+    free(data);
+    if(res == 0){
+        result = false;
+    } else if(res == 1){
+        result = true;
+    } else{
+        result = false;
+        return -1;
+    }
+    return SUCCESS;
+}
+
+RC RelationManager::setIndex(const string& tableName, const string& columnName, bool hasIx){
+    int res = 2; //0 for false, 1 for true, 2 for not found
+    int tableId;
+    RC rc = getTableId(tableName, tableId);
+    if(rc != SUCCESS) return rc;
+
+    FileHandle fileHandle;
+    RBFM_ScanIterator rbfmIter;
+    vector<string> columnAttrStr;
+    for(int i=0;i<columnAttr.size();i++){
+        columnAttrStr.push_back(columnAttr[i].name);
+    }
+    rbfm->openFile(columnFileName, fileHandle);
+    rc = rbfm->scan(fileHandle, columnAttr, "", NO_OP, NULL, columnAttrStr, rbfmIter);
+    if(rc != SUCCESS) {cout<<"fail"<<endl;return -1;}
+    void* data = malloc(4000);
+    memset(data,0,4000);
+    RID rid;
+    while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
+        int pos = 1;
+        int id;
+        memcpy(&id, (char*)data+pos, sizeof(int));
+        pos += 4;
+        if(id == tableId){
+            int length;
+            memcpy(&length, (char*)data+pos, sizeof(int));
+            pos += 4;
+            string name;
+            name.resize(length);
+            memcpy((char*)name.data(),(char*)data+pos,length);
+            pos += length;
+            if(columnName == name){
+                pos += 12;
+                memcpy(&res, (char*)data+pos, 4);
+                int newHasIx;
+                if(hasIx){
+                    newHasIx = 1;
+                } else{
+                    newHasIx = 0;
+                }
+                //cout<<"set pos: "<<id<<", "<<name<<", "<<pos<<", "<<newHasIx<<", "<<rid.pageNum<<", "<<rid.slotNum<<endl;
+                memcpy((char*)data+pos, &newHasIx, 4);
+                rbfm->updateRecord(fileHandle, columnAttr, data, rid);
+                break;
+            }
+        }
+        memset(data,0,4000);
+    }
+    free(data);
+    if(res == 0 || res == 1){
+        return SUCCESS;
+    } else{
+        return -1;
+    }
+    rbfm->closeFile(fileHandle);
+    return SUCCESS;
+}
+
+RC RelationManager::getTableId(const string& tableName, int& tableId){
+    FileHandle fileHandle;
+    RBFM_ScanIterator rbfmIter;
+    vector<string> tableAttrStr;
+    for(int i=0;i<tableAttr.size();i++){
+        tableAttrStr.push_back(tableAttr[i].name);
+    }
+    rbfm->openFile(tableFileName, fileHandle);
+    RC rc = rbfm->scan(fileHandle, tableAttr, "", NO_OP, NULL, tableAttrStr, rbfmIter);
+    if(rc != SUCCESS) {cout<<"get table id fail"<<endl;return -1;}
+    void* data = malloc(4000);
+    memset(data,0,4000);
+    RID rid;
+    tableId = -1;
+    while(rbfmIter.getNextRecord(rid, data) != RM_EOF){
+        int pos = 1;
+        int id;
+        memcpy(&id, (char*)data+pos, sizeof(int));
+        pos += 4;
+        int length;
+        memcpy(&length, (char*)data+pos, sizeof(int));
+        pos += 4;
+        string name;
+        name.resize(length);
+        memcpy((char*)name.data(),(char*)data+pos,length);
+        pos += length;
+        if(name == tableName){
+            tableId = id;
+            break;
+        }
+        memset(data,0,4000);
+    }
+    free(data);
+    if(tableId <= 0){
+        return -1;
+    }
+    rbfm->closeFile(fileHandle);
+    return SUCCESS;
 }
