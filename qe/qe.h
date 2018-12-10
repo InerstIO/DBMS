@@ -233,12 +233,6 @@ class Project : public Iterator {
         void getAttributes(vector<Attribute> &attrs) const;
 };
 
-class DataDir {
-    public:
-        queue<void *> data;
-        queue<int> length;
-};
-
 class BNLJoin : public Iterator {
     // Block nested-loop join operator
     public:
@@ -266,13 +260,14 @@ class BNLJoin : public Iterator {
         vector<Attribute> rightAttrs;
         vector<Attribute> wantAttr;
         int leftAttrId;
+        int rightAttrId;
 
         RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
         // Return the length of data
         int dataLength(const void* data, const vector<Attribute>& recordDescriptor);
-        RC loadPages(Iterator *input, queue<void *> curData, queue<void *> nextData, int maxLen, const vector<Attribute> &attrs);
+        RC loadPages(Iterator *input, queue<void *> &curData, queue<void *> &nextData, int maxLen, const vector<Attribute> &attrs);
         // Use leftData to build hash map
         void buildMap();
 };

@@ -324,6 +324,10 @@ BNLJoin::BNLJoin(Iterator *leftIn, TableScan *rightIn, const Condition &conditio
                             return attr.name == attrName;
                         }) - leftAttrs.begin();
     rightIn->getAttributes(rightAttrs);
+    attrName = condition.rhsAttr;
+    rightAttrId = find_if(rightAttrs.begin(), rightAttrs.end(), [attrName] (const Attribute& attr) {
+                            return attr.name == attrName;
+                        }) - rightAttrs.begin();
     getAttributes(wantAttr);
 }
 
@@ -347,7 +351,7 @@ int BNLJoin::dataLength(const void* data, const vector<Attribute>& recordDescrip
     return dataPos;
 }
 
-RC BNLJoin::loadPages(Iterator *input, queue<void *> curData, queue<void *> nextData, int maxLen, const vector<Attribute> &attrs) {
+RC BNLJoin::loadPages(Iterator *input, queue<void *> &curData, queue<void *> &nextData, int maxLen, const vector<Attribute> &attrs) {
     queue<void *>().swap(curData); // clear curData
     if (!nextData.empty()) {
         curData.push(nextData.front());
@@ -355,8 +359,12 @@ RC BNLJoin::loadPages(Iterator *input, queue<void *> curData, queue<void *> next
     }
     int curLen = 0;
     
-    void* data = malloc(PAGE_SIZE); // TODO: free at appropiate time
-    while(input->getNextTuple(data) != QE_EOF){
+    while(true){
+        void* data = malloc(PAGE_SIZE); // TODO: free at appropiate time
+        RC rc = input->getNextTuple(data);
+        if (rc == QE_EOF) {
+            break;
+        }
         int len = dataLength(data, attrs);
         curLen += len;
         if (curLen > maxLen) {
@@ -480,34 +488,42 @@ RC BNLJoin::getNextTuple(void *data) {
     }
 
     
-    while(loadPages(leftIn, leftData, leftNextData, numPages * PAGE_SIZE, leftAttrs) != QE_EOF){
-        
-        while(loadPages(rightIn, rightData, rightNextData, PAGE_SIZE, rightAttrs) != QE_EOF){
-            buildMap();
+    while(true){
+        RC rc = loadPages(leftIn, leftData, leftNextData, numPages * PAGE_SIZE, leftAttrs);
+        if (rc == QE_EOF && leftData.size() == 0) {
+            break;
+        }
+        buildMap();
+        while(true){
+            rc = loadPages(rightIn, rightData, rightNextData, PAGE_SIZE, rightAttrs);
+            if (rc == QE_EOF && rightData.size() == 0) {
+                break;
+            }
             while(!rightData.empty()){
-                void* front = rightData.front(); //TODO: free
+                void* rightFront = rightData.front(); //TODO: free
                 rightData.pop();
                 unsigned short length = 0;
-                char* record = (char *)data2record(front, leftAttrs, length);
-                switch (leftAttrs[leftAttrId].type)
+                char* record = (char *)data2record(rightFront, rightAttrs, length);
+                deque<void *> matched;
+                switch (rightAttrs[rightAttrId].type)
                 {
                     case TypeInt:
                     {
                         unsigned short startIdx;
                         
-                        if (leftAttrId == 0) {
-                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
+                        if (rightAttrId == 0) {
+                            startIdx = sizeof(short) * rightAttrs.size() + sizeof(int);
                         }
                         else {
                             unsigned short offset;
-                            memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
-                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
+                            memcpy(&offset, record + sizeof(int) + 2 * (rightAttrId - 1), sizeof(short));
+                            startIdx = sizeof(short) * rightAttrs.size() + sizeof(int) + offset;
                         }
 
                         int val;
                         memcpy(&val, record + startIdx, sizeof(int));
-                        deque<void *>::iterator it = outputBuffer.end();
-                        outputBuffer.insert(it, intMap[val].begin(), intMap[val].end());
+                        deque<void *>::iterator it = matched.end();
+                        matched.insert(it, intMap[val].begin(), intMap[val].end());
                         break;
                     }
                         
@@ -515,19 +531,19 @@ RC BNLJoin::getNextTuple(void *data) {
                     {
                         unsigned short startIdx;
                         
-                        if (leftAttrId == 0) {
-                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
+                        if (rightAttrId == 0) {
+                            startIdx = sizeof(short) * rightAttrs.size() + sizeof(int);
                         }
                         else {
                             unsigned short offset;
-                            memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
-                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
+                            memcpy(&offset, record + sizeof(int) + 2 * (rightAttrId - 1), sizeof(short));
+                            startIdx = sizeof(short) * rightAttrs.size() + sizeof(int) + offset;
                         }
 
                         float val;
                         memcpy(&val, record + startIdx, sizeof(float));
-                        deque<void *>::iterator it = outputBuffer.end();
-                        outputBuffer.insert(it, floatMap[val].begin(), floatMap[val].end());
+                        deque<void *>::iterator it = matched.end();
+                        matched.insert(it, floatMap[val].begin(), floatMap[val].end());
                         break;
                     }
                         
@@ -535,13 +551,13 @@ RC BNLJoin::getNextTuple(void *data) {
                     {
                         unsigned short startIdx;
                         
-                        if (leftAttrId == 0) {
-                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int);
+                        if (rightAttrId == 0) {
+                            startIdx = sizeof(short) * rightAttrs.size() + sizeof(int);
                         }
                         else {
                             unsigned short offset;
-                            memcpy(&offset, record + sizeof(int) + 2 * (leftAttrId - 1), sizeof(short));
-                            startIdx = sizeof(short) * leftAttrs.size() + sizeof(int) + offset;
+                            memcpy(&offset, record + sizeof(int) + 2 * (rightAttrId - 1), sizeof(short));
+                            startIdx = sizeof(short) * rightAttrs.size() + sizeof(int) + offset;
                         }
 
                         int l;
@@ -549,8 +565,8 @@ RC BNLJoin::getNextTuple(void *data) {
                         char* val = new char[PAGE_SIZE];
                         memcpy(&val, record + startIdx + sizeof(int), l);
                         string str(val, l);
-                        deque<void *>::iterator it = outputBuffer.end();
-                        outputBuffer.insert(it, stringMap[str].begin(), stringMap[str].end());
+                        deque<void *>::iterator it = matched.end();
+                        matched.insert(it, stringMap[str].begin(), stringMap[str].end());
 
                         delete[] val;
                         break;
@@ -559,6 +575,59 @@ RC BNLJoin::getNextTuple(void *data) {
                     default:
                         break;
                 }
+                deque<void *>::iterator leftIt = matched.begin();
+                deque<void *>::iterator it = outputBuffer.end();
+                
+                while(leftIt != matched.end()){
+                    void* leftFront = matched.front();
+                    void* joined = malloc(PAGE_SIZE);//TODO: free when appropriate
+                    vector<char> nullBits(ceil((leftAttrs.size()+rightAttrs.size())/8.0), 0);
+                    int i = 0;
+                    for(int j=0;j<leftAttrs.size();j++){
+                        char nullByte = *((char*)leftFront+j/8);
+                        bitset<8> curBit(nullByte);
+                        nullBits[i/8] += curBit[j%8]<<(i%8);
+                        i++;
+                    }
+                    for(int j=0;j<rightAttrs.size();j++){
+                        char nullByte = *((char*)rightFront+j/8);
+                        bitset<8> curBit(nullByte);
+                        nullBits[i/8] += curBit[j%8]<<(i%8);
+                        i++;
+                    }
+                    int offset = 0;
+                    int leftOffset = 0;
+                    for(int i=0;i<nullBits.size();i++){
+                        memcpy((char*)joined+offset, &(nullBits[i]), 1);
+                        offset++;
+                    }
+                    for(i=0;i<leftAttrs.size();i++){
+                        if(leftAttrs[i].type == TypeVarChar){
+                            int l = leftAttrs[i].length;
+                            memcpy((char*)joined+offset, &l, sizeof(int));
+                            offset += 4;
+                        }
+                        memcpy((char*)joined+offset, (char*)leftFront+(int)ceil(leftAttrs.size()/8.0)+leftOffset, leftAttrs[i].length);
+                        offset += leftAttrs[i].length;
+                        leftOffset += leftAttrs[i].length;
+                    }
+                    int rightOffset = 0;
+                    for(i=0;i<rightAttrs.size();i++){
+                        if(rightAttrs[i].type == TypeVarChar){
+                            int l = rightAttrs[i].length;
+                            memcpy((char*)joined+offset, &l, sizeof(int));
+                            offset += 4;
+                        }
+                        memcpy((char*)joined+offset, (char*)rightFront+(int)ceil(rightAttrs.size()/8.0)+rightOffset, rightAttrs[i].length);
+                        offset += rightAttrs[i].length;
+                        rightOffset += rightAttrs[i].length;
+                    }
+                    memset((char*)rightFront, 0, PAGE_SIZE);
+                    outputBuffer.insert(it, joined);
+                    leftIt++;
+                    it++;
+                }
+                
                 delete[] record;
             }
         }
@@ -572,6 +641,17 @@ RC BNLJoin::getNextTuple(void *data) {
         }
     }
     return QE_EOF;
+}
+
+void BNLJoin::getAttributes(vector<Attribute> &attrs) const {
+    for(int i=0;i<leftAttrs.size();i++){
+		Attribute attr = leftAttrs[i];
+		attrs.push_back(attr);
+	}
+	for(int i=0;i<rightAttrs.size();i++){
+		Attribute attr = rightAttrs[i];
+		attrs.push_back(attr);
+    }
 }
 
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op) {
